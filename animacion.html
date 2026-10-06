@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ómnibus pegados · con y sin pausas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link href="css2" rel="stylesheet">
+<link href="maplibre-gl.css" rel="stylesheet">
+<script src="maplibre-gl.js"></script>
+<style>
+:root {
+  --surface: #0e0e10; --glass: rgba(23, 23, 26, 0.88); --line: rgba(255,255,255,.09);
+  --text-1: #ececec; --text-2: #a8a8ad; --text-3: #75757b;
+  --accent: #7fb2ff; --est: #d9a35a; --hold: #e3c06a; --peg: #e5735f; --base: #75757b; --good: #5fc999;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--surface); color: var(--text-1); font: 13px/1.45 "IBM Plex Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
+.glass { background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid var(--line); border-radius: 14px; }
+.tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .06em; padding: 2px 6px; border-radius: 5px; border: 1px solid; color: var(--est); border-color: rgba(240,138,92,.45); }
+#app { position: absolute; inset: 0; display: grid; grid-template-rows: auto 1fr 190px; gap: 10px; padding: 12px; }
+header { display: flex; align-items: center; gap: 14px; padding: 10px 14px; flex-wrap: wrap; }
+header h1 { margin: 0; font-size: 17px; letter-spacing: -.01em; }
+header .sub { color: var(--text-3); font-size: 12px; }
+header a { color: var(--text-3); text-decoration: none; font-size: 12px; }
+select { all: unset; cursor: pointer; background: rgba(255,255,255,.06); padding: 6px 10px; border-radius: 8px; font-weight: 600; }
+#play { all: unset; width: 34px; height: 34px; border-radius: 50%; background: var(--text-1); color: var(--surface); display: grid; place-items: center; cursor: pointer; }
+#clock { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 78px; }
+.speed { display: flex; background: rgba(255,255,255,.05); border-radius: 8px; padding: 2px; gap: 2px; }
+.speed button { all: unset; cursor: pointer; font-size: 11.5px; color: var(--text-2); padding: 4px 8px; border-radius: 6px; }
+.speed button.on { background: rgba(255,255,255,.14); color: var(--text-1); }
+.ahorro { margin-left: auto; text-align: right; }
+.ahorro .v { font-size: 22px; font-weight: 700; color: var(--good); font-variant-numeric: tabular-nums; }
+.ahorro .k { color: var(--text-3); font-size: 11.5px; }
+.maps { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; min-height: 0; }
+.mapw { position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
+.mapw .m { position: absolute; inset: 0; }
+.chip { position: absolute; top: 10px; left: 10px; padding: 8px 12px; z-index: 2; }
+.chip b { font-size: 14px; }
+.chip .s { color: var(--text-3); font-size: 11.5px; }
+.kpis { position: absolute; left: 10px; bottom: 10px; display: grid; grid-template-columns: repeat(4, auto); gap: 6px; z-index: 2; }
+.kpi { padding: 7px 10px; }
+.kpi .v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kpi .k { font-size: 10.5px; color: var(--text-3); }
+.legend { position: absolute; right: 10px; bottom: 10px; padding: 9px 11px; z-index: 2; font-size: 11px; color: var(--text-2); display: grid; gap: 5px; }
+.legend .r { display: flex; align-items: center; gap: 7px; }
+.legend i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.bar { width: 90px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #1d4ed8, #0ea5e9, #7dd3fc, #e0f2fe); }
+#bottom { padding: 10px 14px; display: grid; grid-template-columns: 520px 1fr; gap: 18px; }
+.chartw { display: flex; flex-direction: column; min-width: 0; }
+#inds { display: grid; grid-template-columns: auto 1fr 1fr 1fr; gap: 2px 12px; align-content: center; font-variant-numeric: tabular-nums; font-size: 12px; }
+#inds .h { color: var(--text-3); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; }
+#inds .n { color: var(--text-2); }
+#inds .g { color: var(--good); font-weight: 600; }
+#inds .b { color: var(--peg); font-weight: 600; }
+.btn2 { all: unset; cursor: pointer; font-size: 12px; color: var(--text-2); padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); }
+.btn2:hover { color: var(--text-1); }
+#fin { position: absolute; inset: 0; z-index: 30; display: none; place-items: center; background: rgba(14,14,16,.9); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); overflow: auto; padding: 24px; }
+#fin .box { max-width: 1100px; width: 100%; }
+#fin h2 { font-size: 26px; margin: 0 0 4px; letter-spacing: -.02em; }
+#fin .lead { color: var(--text-2); margin-bottom: 22px; }
+.big { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+.big .c { padding: 18px; }
+.big .v { font-size: 34px; font-weight: 700; letter-spacing: -.02em; color: var(--good); font-variant-numeric: tabular-nums; }
+.big .k { color: var(--text-2); font-size: 13px; margin-top: 2px; }
+.big .s { color: var(--text-3); font-size: 12px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.cols .c { padding: 16px 18px; }
+.cols h3 { margin: 0 0 10px; font-size: 14px; }
+.cols table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.cols td { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.cols td:not(:first-child) { text-align: right; }
+.cols td.g { color: var(--good); font-weight: 600; }
+.fin-btns { display: flex; gap: 10px; margin-top: 18px; }
+.fin-btns button { all: unset; cursor: pointer; padding: 10px 18px; border-radius: 999px; font-weight: 600; }
+.fin-btns .p { background: var(--text-1); color: var(--surface); }
+.fin-btns .q { border: 1px solid var(--line); color: var(--text-2); }
+.nota { color: var(--text-3); font-size: 11.5px; margin-top: 14px; }
+@media (max-width: 1100px) { #bottom { grid-template-columns: 1fr; } .big { grid-template-columns: repeat(2, 1fr); } .cols { grid-template-columns: 1fr; } }
+#bottom h3 { margin: 0; font-size: 12.5px; font-weight: 600; display: flex; gap: 14px; align-items: center; }
+#bottom h3 span { color: var(--text-3); font-weight: 400; display: inline-flex; align-items: center; gap: 6px; }
+#bottom h3 span i { width: 14px; height: 2px; display: inline-block; }
+#chart { flex: 1; position: relative; }
+#chart svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.axis text { fill: var(--text-3); font-size: 10.5px; font-family: "IBM Plex Sans", sans-serif; }
+#start { position: absolute; inset: 0; display: grid; place-items: center; z-index: 20; background: rgba(14,14,16,.55); }
+#start button { all: unset; cursor: pointer; padding: 14px 26px; border-radius: 999px; background: var(--text-1); color: var(--surface); font-weight: 700; font-size: 15px; }
+#start p { color: var(--text-2); text-align: center; max-width: 520px; margin: 14px auto 0; }
+.maplibregl-ctrl-attrib { background: rgba(14,14,16,.6) !important; font-size: 10px; }
+.maplibregl-ctrl-attrib a { color: var(--text-3) !important; }
+@media (max-width: 900px) { .maps { grid-template-columns: 1fr; } .kpis { grid-template-columns: repeat(2, auto); } }
+.topnav { display: flex; gap: 4px; flex-wrap: wrap; font-size: 12.5px; margin-bottom: 12px; }
+.topnav a { color: var(--text-2); text-decoration: none; padding: 4px 10px; border-radius: 999px; }
+.topnav a:hover { background: rgba(255,255,255,.05); color: var(--text-1); }
+.topnav a.on { background: var(--text-1); color: var(--surface); font-weight: 600; }
+.credito { color: var(--text-3); font-size: 11.5px; margin-top: 10px; }
+.credito a { color: var(--text-2); text-decoration: none; border-bottom: 1px solid var(--line); }
+.credito a:hover { color: var(--text-1); }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="glass">
+    <div>
+      <nav class="topnav"><a href="index.html">Inicio</a><a href="mapa.html">Mapa de la ciudad</a><a href="animacion.html" class="on">Simulación animada</a><a href="simulador.html">Simulador detallado</a><a href="linea.html">Promedio por parada</a></nav>
+      <h1>Un día de la línea, sin y con pausas</h1>
+      <div class="credito" style="margin:0 0 4px">Hecho por Tomás Sanz · <a href="https://www.linkedin.com/in/tomassanz/" target="_blank" rel="noopener">LinkedIn</a> · <a href="https://x.com/tomi_sanz" target="_blank" rel="noopener">X / Twitter</a></div>
+      <div class="sub">Mismos pasajeros y mismo tránsito en los dos mapas. Simulación calibrada con agosto 2026 <span class="tag">ESTIMADO</span></div>
+    </div>
+    <select id="linea"><option value="0">Línea 151 → Complejo América</option><option value="1">Línea 306 → Casabó</option><option value="2">Línea 306 → Géant</option><option value="3">Línea 468 → Playa Malvín</option><option value="4">Línea 185 → Pocitos</option><option value="5">Línea 468 → La Paz</option><option value="6">Línea 105 → Plaza España</option><option value="7">Línea 180 → Plaza Gerardo Cuesta</option><option value="8">Línea 185 → Rivera Y Luis A De Herrera</option><option value="9">Línea 195 → Buceo</option><option value="10">Línea 181 → Paso Molino</option><option value="11">Línea 103 → Plaza España</option><option value="12">Línea 183 → Paso Molino</option><option value="13">Línea 145 → Complejo América</option><option value="14">Línea 183 → Pocitos</option><option value="15">Línea 405 → Parque Rodó</option><option value="16">Línea 526 → Playa Malvín</option><option value="17">Línea 300 → Instrucciones Y José Belloni</option><option value="18">Línea 163 → Pocitos</option><option value="19">Línea 174 → Punta Carretas</option><option value="20">Línea 300 → Plaza Zitarrosa</option><option value="21">Línea 526 → Complejo América</option><option value="22">Línea 181 → Pocitos</option><option value="23">Línea 546 → Portones</option><option value="24">Línea 546 → Belvedere</option><option value="25">Línea 185 → Casabó</option><option value="26">Línea 370 → Playa Del Cerro</option><option value="27">Línea 110 → Plaza España</option><option value="28">Línea 137 → Paso De La Arena</option><option value="29">Línea 370 → Portones</option><option value="30">Línea 163 → Paso De La Arena</option><option value="31">Línea 174 → Aviación Civil</option><option value="32">Línea 151 → Portones</option><option value="33">Línea 468 → Portones</option><option value="34">Línea 149 → Pocitos</option><option value="35">Línea 494 → Buceo</option><option value="36">Línea 102 → Gruta De Lourdes</option><option value="37">Línea 103 → Los Aromos</option><option value="38">Línea 582 → Punta Carretas</option><option value="39">Línea 124 → Santa Catalina</option><option value="40">Línea 427 → Uam</option><option value="41">Línea 505 → Andaluz</option><option value="42">Línea 60 → Portones</option><option value="43">Línea 582 → Peñarol</option><option value="44">Línea 100 → Plaza España</option><option value="45">Línea 128 → Pocitos</option><option value="46">Línea 21 → Plaza Independencia</option><option value="47">Línea 151 → Verdisol</option><option value="48">Línea 175 → Las Piedras</option><option value="49">Línea 405 → Peñarol</option><option value="50">Línea 128 → Paso De La Arena</option><option value="51">Línea 505 → Ciudadela</option><option value="52">Línea 100 → Villa Farré</option><option value="53">Línea 137 → Plaza España</option><option value="54">Línea 145 → Plaza España</option><option value="55">Línea 175 → Ciudadela</option><option value="56">Línea 2 → Hospital Saint Bois</option><option value="57">Línea 130 → La Paz</option><option value="58">Línea 124 → Ciudad Vieja</option><option value="59">Línea 158 → Gruta De Lourdes</option><option value="60">Línea 316 → Pocitos</option><option value="61">Línea 192 → Parque Rodó</option><option value="62">Línea 105 → Géant</option><option value="63">Línea 169 → Ciudadela</option><option value="64">Línea 192 → Manga</option><option value="65">Línea 60 → Ciudad Vieja</option><option value="66">Línea 195 → Playa Del Cerro</option><option value="67">Línea 180 → Ciudad Vieja</option><option value="68">Línea 144 → Plaza Independencia</option><option value="69">Línea 109 → Plaza España</option><option value="70">Línea 121 → Ciudad Vieja</option><option value="71">Línea 522 → Sayago</option><option value="72">Línea 199 → Cementerio Del Norte</option><option value="73">Línea 121 → Punta Carretas</option><option value="74">Línea 199 → Punta Carretas</option><option value="75">Línea 522 → Pocitos</option><option value="76">Línea 144 → Cementerio Del Norte</option><option value="77">Línea 427 → Portones</option><option value="78">Línea 2 → Portones</option><option value="79">Línea 76 → Punta Carretas</option><option value="80">Línea 116 → Ciudad Vieja</option><option value="81">Línea 76 → Playa Del Cerro</option><option value="82">Línea 116 → Pocitos</option><option value="83">Línea 125 → Playa Del Cerro</option><option value="84">Línea 148 → Aviación Civil</option><option value="85">Línea 21 → Portones</option><option value="86">Línea 17 → Casabó</option><option value="87">Línea 169 → Toledo Chico</option><option value="88">Línea 404 → Palacio De La Luz</option><option value="89">Línea 17 → Punta Carretas</option><option value="90">Línea 130 → Ciudadela</option><option value="91">Línea 142 → Plaza España</option><option value="92">Línea 404 → Complejo Juana De América</option><option value="93">Línea 316 → Cno Maldonado Km 16</option><option value="94">Línea 409 → Plaza España</option><option value="95">Línea 402 → Playa Malvín</option><option value="96">Línea 407 → Portones</option><option value="97">Línea 156 → Hipódromo</option><option value="98">Línea 456 → Mendoza E Instrucciones</option><option value="99">Línea 407 → Plaza España</option><option value="100">Línea 104 → Plaza Independencia</option><option value="101">Línea 125 → Ciudad Vieja</option><option value="102">Línea 328 → Punta Carretas</option><option value="103">Línea 402 → Ciudadela</option><option value="104">Línea 494 → Delta Del Tigre</option><option value="105">Línea 409 → Hospital Saint Bois</option><option value="106">Línea 188 → Palacio De La Luz</option><option value="107">Línea 188 → Ciudad Vieja</option><option value="108">Línea 111 → Playa Malvín</option><option value="109">Línea 156 → Ciudadela</option><option value="110">Línea 538 → Plaza España</option><option value="111">Línea L14 → Paso Molino</option><option value="112">Línea L14 → Paso De La Arena</option><option value="113">Línea 328 → Mendoza E Instrucciones</option><option value="114">Línea 149 → Manga</option><option value="115">Línea 330 → Ciudadela</option><option value="116">Línea 524 → Tres Ombúes</option><option value="117">Línea 115 → Tres Cruces</option><option value="118">Línea 115 → Vista Linda</option><option value="119">Línea 142 → Rambla Costanera</option><option value="120">Línea 330 → Mendoza E Instrucciones</option><option value="121">Línea 110 → Puntas De Macadam</option><option value="122">Línea 127 → Delta Del Tigre</option><option value="123">Línea 111 → Tres Cruces</option><option value="124">Línea 104 → Géant</option><option value="125">Línea L29 → Belvedere</option><option value="126">Línea L15 → Pajas Blancas</option><option value="127">Línea D8 → Cno Maldonado Km 21</option><option value="128">Línea L4 → Terminal Del Cerro</option><option value="129">Línea D11 → Ciudad Vieja</option><option value="130">Línea L9 → Intercambiador Belloni</option><option value="131">Línea 117 → Plaza Independencia</option><option value="132">Línea L9 → Villa Farré</option><option value="133">Línea 117 → Punta Carretas</option><option value="134">Línea D11 → Géant</option><option value="135">Línea L15 → Terminal Del Cerro</option><option value="136">Línea E14 → Ciudad Vieja</option><option value="137">Línea L4 → La Boyada</option><option value="138">Línea L28 → Paso Molino</option><option value="139">Línea L29 → Complejo América</option><option value="140">Línea E14 → Pocitos</option><option value="141">Línea 109 → Géant</option><option value="142">Línea 158 → Aduana</option><option value="143">Línea 102 → Plaza España</option><option value="144">Línea 113 → Playa Malvín</option><option value="145">Línea 524 → Ciudad Vieja</option><option value="146">Línea 127 → Aduana</option><option value="147">Línea 105 → Plaza Independencia</option><option value="148">Línea L16 → Pajas Blancas</option><option value="149">Línea 456 → Uruguay Y Florida</option><option value="150">Línea 148 → Aduana</option><option value="151">Línea D8 → Plaza Independencia</option></select>
+    <select id="dia"><option value="151_9009_s1">Día hábil simulado 1</option><option value="151_9009_s2">Día hábil simulado 2</option><option value="151_9009_s3">Día hábil simulado 3</option><option value="151_9009_s4">Día hábil simulado 4</option><option value="151_9009_s5">Día hábil simulado 5</option></select>
+    <button id="play" aria-label="Reproducir"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.5v9l7.5-4.5z" fill="currentColor"></path></svg></button>
+    <div id="clock">06:30</div>
+    <div class="speed" id="speed"><button data-v="60">1 min/s</button><button data-v="180" class="on">3 min/s</button><button data-v="600">10 min/s</button></div>
+    <button id="verres" class="btn2">Ver resumen</button>
+    <div class="ahorro"><div class="v" id="ahorro">-0 h</div><div class="k">horas de espera ahorradas hasta ahora</div></div>
+  </header>
+
+  <div class="maps">
+    <div class="mapw"><div class="m maplibregl-map" id="mapA"><div class="maplibregl-canvas-container maplibregl-interactive maplibregl-touch-drag-pan maplibregl-touch-zoom-rotate"><canvas class="maplibregl-canvas" tabindex="0" aria-label="Map" role="region" width="1872" height="765" style="width: 749px; height: 306px;"></canvas></div><div class="maplibregl-control-container"><div class="maplibregl-ctrl-top-left "></div><div class="maplibregl-ctrl-top-right "></div><div class="maplibregl-ctrl-bottom-left "></div><div class="maplibregl-ctrl-bottom-right "><details class="maplibregl-ctrl maplibregl-ctrl-attrib maplibregl-compact maplibregl-compact-show" open=""><summary class="maplibregl-ctrl-attrib-button" title="Toggle attribution" aria-label="Toggle attribution"></summary><div class="maplibregl-ctrl-attrib-inner">© <a href="https://carto.com/about-carto/" target="_blank" rel="noopener">CARTO</a>, © <a href="http://www.openstreetmap.org/about/" target="_blank">OpenStreetMap</a> contributors</div></details></div></div></div>
+      <div class="chip glass"><b>Sin control</b><div class="s">como funciona hoy</div></div>
+      <div class="kpis" id="kA">
+      <div class="kpi glass"><div class="v">52</div><div class="k">esperando ahora</div></div>
+      <div class="kpi glass"><div class="v" style="color:inherit">0</div><div class="k">buses apretados</div></div>
+      <div class="kpi glass"><div class="v" style="color:var(--peg)">4</div><div class="k">buses pegados</div></div>
+      <div class="kpi glass"><div class="v">35 h</div><div class="k">espera acumulada</div></div></div>
+    </div>
+    <div class="mapw"><div class="m maplibregl-map" id="mapB"><div class="maplibregl-canvas-container maplibregl-interactive maplibregl-touch-drag-pan maplibregl-touch-zoom-rotate"><canvas class="maplibregl-canvas" tabindex="0" aria-label="Map" role="region" width="1872" height="765" style="width: 749px; height: 306px;"></canvas></div><div class="maplibregl-control-container"><div class="maplibregl-ctrl-top-left "></div><div class="maplibregl-ctrl-top-right "></div><div class="maplibregl-ctrl-bottom-left "></div><div class="maplibregl-ctrl-bottom-right "><details class="maplibregl-ctrl maplibregl-ctrl-attrib maplibregl-compact maplibregl-compact-show" open=""><summary class="maplibregl-ctrl-attrib-button" title="Toggle attribution" aria-label="Toggle attribution"></summary><div class="maplibregl-ctrl-attrib-inner">© <a href="https://carto.com/about-carto/" target="_blank" rel="noopener">CARTO</a>, © <a href="http://www.openstreetmap.org/about/" target="_blank">OpenStreetMap</a> contributors</div></details></div></div></div>
+      <div class="chip glass"><b>Con pausas inteligentes</b><div class="s">terminal hasta 8 min · paradas hasta 45 s</div></div>
+      <div class="kpis" id="kB">
+      <div class="kpi glass"><div class="v">41</div><div class="k">esperando ahora</div></div>
+      <div class="kpi glass"><div class="v" style="color:inherit">0</div><div class="k">buses apretados</div></div>
+      <div class="kpi glass"><div class="v" style="color:var(--peg)">2</div><div class="k">buses pegados</div></div>
+      <div class="kpi glass"><div class="v">36 h</div><div class="k">espera acumulada</div></div></div>
+      <div class="legend glass">
+        <div class="r"><span class="bar"></span> gente a bordo (0 → 60)</div>
+        <div class="r"><i style="background:#e8894a"></i> apretado (más de 60)</div>
+        <div class="r"><i style="border:2px solid #e5735f"></i> pegado a otro bus</div>
+        <div class="r"><i style="border:2px solid #e3c06a"></i> en pausa</div>
+        <div class="r"><i style="background:rgba(227,192,106,.7)"></i> gente esperando en la parada</div>
+      </div>
+    </div>
+  </div>
+
+  <section id="bottom" class="glass">
+    <div id="inds"><div class="h">Día completo</div><div class="h">Sin control</div><div class="h">Con pausas</div><div class="h">Diferencia</div><div class="n">Espera media</div><div>13,74 min</div><div>11,84 min</div><div class="g">-1,90 min</div><div class="n">Tiempo total por viaje</div><div>38,28 min</div><div>36,66 min</div><div class="g">-1,62 min</div><div class="n">Tiempo arriba del bus</div><div>24,54 min</div><div>24,82 min</div><div class="b">+0,28 min</div><div class="n">% del viaje apretado</div><div>23,3%</div><div>20,7%</div><div class="g">-2,6 p</div><div class="n">Buses pegados (pico)</div><div>31,7%</div><div>10,0%</div><div class="g">-21,7 p</div><div class="n">Pasadas llenas</div><div>36</div><div>15</div><div class="g">-21</div><div class="n">Gente que quedó abajo</div><div>638</div><div>473</div><div class="g">-165</div></div>
+    <div class="chartw">
+      <h3>Gente esperando en las paradas, a lo largo del día
+        <span><i style="background:#7f89a3"></i> sin control</span><span><i style="background:#7fb2ff"></i> con pausas</span></h3>
+      <div id="chart"><svg viewBox="0 0 944 150"><line x1="40" x2="944" y1="132" y2="132" stroke="rgba(255,255,255,.07)"></line><text x="34" y="135.5" text-anchor="end" class="axis" fill="#7c7b74" font-size="10.5">0</text><line x1="40" x2="944" y1="88.30461922596754" y2="88.30461922596754" stroke="rgba(255,255,255,.07)"></line><text x="34" y="91.80461922596754" text-anchor="end" class="axis" fill="#7c7b74" font-size="10.5">100</text><line x1="40" x2="944" y1="44.60923845193508" y2="44.60923845193508" stroke="rgba(255,255,255,.07)"></line><text x="34" y="48.10923845193508" text-anchor="end" class="axis" fill="#7c7b74" font-size="10.5">200</text><text x="87.30465320456541" y="147" text-anchor="middle" fill="#7c7b74" font-size="10.5">6h</text><text x="181.91395961369622" y="147" text-anchor="middle" fill="#7c7b74" font-size="10.5">8h</text><text x="276.52326602282704" y="147" text-anchor="middle" fill="#7c7b74" font-size="10.5">10h</text><text x="371.13257243195784" y="147" text-anchor="middle" fill="#7c7b74" font-size="10.5">12h</text><text x="465.7418788410887" y="147" text-anchor="middle" fill="#7c7b74" font-size="10.5">14h</text><text x="560.3511852502195" y="147" text-anchor="middle" fill="#7c7b74" font-size="10.5">16h</text><text x="654.9604916593503" y="147" text-anchor="middle" fill="#7c7b74" font-size="10.5">18h</text><text x="749.5697980684811" y="147" text-anchor="middle" fill="#7c7b74" font-size="10.5">20h</text><text x="844.179104477612" y="147" text-anchor="middle" fill="#7c7b74" font-size="10.5">22h</text><text x="938.7884108867428" y="147" text-anchor="middle" fill="#7c7b74" font-size="10.5">24h</text><path d="M40.0,127.6L40.8,127.6L41.6,126.8L42.4,126.3L43.2,126.3L43.9,126.3L44.7,125.4L45.5,125.0L46.3,124.6L47.1,124.6L47.9,124.1L48.7,124.1L49.5,123.3L50.2,123.3L51.0,123.7L51.8,123.7L52.6,123.7L53.4,122.8L54.2,122.8L55.0,122.4L55.8,122.0L56.6,120.6L57.3,121.5L58.1,120.6L58.9,124.1L59.7,124.6L60.5,124.6L61.3,124.6L62.1,125.4L62.9,125.9L63.7,124.6L64.4,122.8L65.2,124.1L66.0,123.7L66.8,124.1L67.6,124.6L68.4,124.1L69.2,125.0L70.0,124.6L70.7,125.0L71.5,124.6L72.3,124.6L73.1,124.1L73.9,124.1L74.7,124.6L75.5,124.6L76.3,125.0L77.1,125.0L77.8,125.9L78.6,125.9L79.4,125.9L80.2,125.9L81.0,125.0L81.8,125.0L82.6,125.4L83.4,123.7L84.2,123.7L84.9,123.3L85.7,123.3L86.5,124.1L87.3,124.1L88.1,123.3L88.9,121.5L89.7,119.8L90.5,120.6L91.2,120.2L92.0,121.1L92.8,121.1L93.6,120.6L94.4,119.3L95.2,116.7L96.0,117.6L96.8,117.6L97.6,118.5L98.3,117.1L99.1,115.8L99.9,118.5L100.7,116.3L101.5,115.4L102.3,114.1L103.1,114.5L103.9,116.7L104.6,115.8L105.4,116.3L106.2,116.3L107.0,113.6L107.8,111.9L108.6,111.0L109.4,110.2L110.2,110.6L111.0,109.3L111.7,111.9L112.5,110.6L113.3,112.8L114.1,111.5L114.9,113.2L115.7,112.8L116.5,111.9L117.3,110.2L118.1,109.7L118.8,109.7L119.6,111.9L120.4,110.6L121.2,112.8L122.0,113.2L122.8,110.2L123.6,107.1L124.4,106.7L125.1,109.3L125.9,107.1L126.7,106.2L127.5,108.0L128.3,106.7L129.1,106.2L129.9,107.5L130.7,108.0L131.5,108.4L132.2,109.3L133.0,111.5L133.8,109.7L134.6,109.3L135.4,107.5L136.2,105.3L137.0,102.7L137.8,100.1L138.6,101.4L139.3,97.9L140.1,100.5L140.9,99.7L141.7,98.8L142.5,95.7L143.3,94.0L144.1,91.8L144.9,92.2L145.6,91.8L146.4,93.1L147.2,91.4L148.0,90.1L148.8,90.1L149.6,87.4L150.4,88.3L151.2,86.1L152.0,84.8L152.7,81.8L153.5,79.1L154.3,79.1L155.1,78.3L155.9,75.2L156.7,76.1L157.5,79.6L158.3,78.3L159.1,83.9L159.8,85.2L160.6,84.8L161.4,82.6L162.2,81.8L163.0,82.6L163.8,80.9L164.6,86.1L165.4,86.6L166.1,85.2L166.9,85.2L167.7,82.2L168.5,84.4L169.3,83.1L170.1,81.3L170.9,80.9L171.7,82.6L172.5,84.8L173.2,80.0L174.0,80.9L174.8,80.4L175.6,83.9L176.4,82.2L177.2,84.8L178.0,82.6L178.8,85.2L179.5,89.6L180.3,92.2L181.1,92.2L181.9,90.9L182.7,91.4L183.5,91.4L184.3,90.5L185.1,89.6L185.9,87.9L186.6,87.4L187.4,88.3L188.2,94.4L189.0,95.7L189.8,96.2L190.6,97.9L191.4,97.9L192.2,97.9L193.0,101.0L193.7,99.2L194.5,99.2L195.3,94.4L196.1,93.1L196.9,94.9L197.7,99.2L198.5,97.9L199.3,100.1L200.0,97.9L200.8,98.8L201.6,99.2L202.4,97.0L203.2,97.0L204.0,94.0L204.8,96.2L205.6,96.2L206.4,97.0L207.1,95.3L207.9,95.7L208.7,96.2L209.5,97.5L210.3,95.7L211.1,94.4L211.9,92.2L212.7,90.9L213.5,92.2L214.2,94.0L215.0,98.4L215.8,100.5L216.6,101.9L217.4,101.9L218.2,102.7L219.0,104.5L219.8,106.7L220.5,107.1L221.3,110.2L222.1,110.6L222.9,110.2L223.7,109.3L224.5,111.0L225.3,108.0L226.1,108.8L226.9,110.2L227.6,108.8L228.4,109.7L229.2,108.4L230.0,104.9L230.8,106.2L231.6,108.0L232.4,108.4L233.2,109.7L233.9,109.3L234.7,106.7L235.5,107.1L236.3,109.3L237.1,110.6L237.9,110.2L238.7,107.5L239.5,105.3L240.3,108.0L241.0,108.0L241.8,103.6L242.6,101.0L243.4,101.9L244.2,101.0L245.0,102.3L245.8,103.2L246.6,101.9L247.4,98.8L248.1,100.5L248.9,102.3L249.7,101.4L250.5,105.3L251.3,103.2L252.1,102.7L252.9,104.5L253.7,105.8L254.4,103.6L255.2,101.9L256.0,99.2L256.8,100.5L257.6,103.2L258.4,99.7L259.2,101.0L260.0,101.4L260.8,102.7L261.5,102.3L262.3,104.9L263.1,104.0L263.9,103.2L264.7,101.9L265.5,97.5L266.3,100.1L267.1,99.7L267.9,97.9L268.6,93.5L269.4,98.8L270.2,99.2L271.0,104.9L271.8,103.2L272.6,101.9L273.4,104.5L274.2,102.7L274.9,101.9L275.7,102.7L276.5,101.4L277.3,101.9L278.1,103.6L278.9,111.5L279.7,113.6L280.5,115.4L281.3,115.4L282.0,111.5L282.8,111.5L283.6,111.9L284.4,110.6L285.2,110.6L286.0,110.2L286.8,106.7L287.6,105.8L288.3,104.5L289.1,104.5L289.9,102.3L290.7,102.3L291.5,103.2L292.3,99.2L293.1,99.7L293.9,103.6L294.7,106.2L295.4,106.7L296.2,103.2L297.0,101.4L297.8,103.2L298.6,104.0L299.4,104.0L300.2,106.2L301.0,102.3L301.8,102.7L302.5,99.7L303.3,100.1L304.1,101.9L304.9,101.0L305.7,104.9L306.5,103.2L307.3,104.0L308.1,106.7L308.8,114.1L309.6,118.5L310.4,117.1L311.2,113.2L312.0,113.2L312.8,111.9L313.6,111.5L314.4,108.0L315.2,107.5L315.9,106.7L316.7,102.7L317.5,102.3L318.3,101.0L319.1,100.5L319.9,100.1L320.7,99.7L321.5,96.6L322.3,94.9L323.0,94.4L323.8,94.0L324.6,91.4L325.4,98.8L326.2,94.4L327.0,91.4L327.8,89.6L328.6,90.1L329.3,89.2L330.1,87.4L330.9,87.9L331.7,87.9L332.5,87.9L333.3,86.1L334.1,87.4L334.9,83.9L335.7,82.6L336.4,82.6L337.2,82.6L338.0,81.3L338.8,82.6L339.6,83.9L340.4,83.5L341.2,83.9L342.0,85.2L342.7,83.1L343.5,80.0L344.3,77.4L345.1,74.8L345.9,73.0L346.7,73.4L347.5,75.6L348.3,74.8L349.1,74.8L349.8,72.6L350.6,70.0L351.4,78.3L352.2,75.2L353.0,75.6L353.8,71.3L354.6,72.6L355.4,70.4L356.2,70.4L356.9,71.3L357.7,70.0L358.5,70.8L359.3,70.4L360.1,67.8L360.9,66.5L361.7,68.6L362.5,67.8L363.2,68.6L364.0,69.5L364.8,69.5L365.6,65.6L366.4,63.8L367.2,69.1L368.0,79.6L368.8,83.5L369.6,88.7L370.3,97.9L371.1,94.0L371.9,91.8L372.7,88.3L373.5,88.3L374.3,88.3L375.1,86.6L375.9,83.5L376.7,84.4L377.4,80.0L378.2,86.1L379.0,80.9L379.8,78.3L380.6,78.7L381.4,78.3L382.2,78.7L383.0,79.6L383.7,73.4L384.5,75.6L385.3,76.9L386.1,71.7L386.9,71.3L387.7,73.0L388.5,71.3L389.3,80.9L390.1,80.4L390.8,81.3L391.6,78.7L392.4,78.3L393.2,72.6L394.0,73.4L394.8,70.8L395.6,68.2L396.4,68.2L397.2,71.3L397.9,77.4L398.7,72.6L399.5,70.8L400.3,69.5L401.1,73.0L401.9,73.0L402.7,70.0L403.5,69.1L404.2,75.6L405.0,74.3L405.8,73.4L406.6,74.3L407.4,71.7L408.2,68.6L409.0,71.7L409.8,69.1L410.6,70.8L411.3,70.4L412.1,68.6L412.9,66.9L413.7,69.1L414.5,66.0L415.3,66.5L416.1,65.6L416.9,80.9L417.6,85.7L418.4,83.5L419.2,83.5L420.0,81.3L420.8,82.6L421.6,78.7L422.4,80.0L423.2,75.2L424.0,83.5L424.7,81.8L425.5,78.3L426.3,75.2L427.1,75.6L427.9,73.9L428.7,75.2L429.5,78.7L430.3,77.8L431.1,77.8L431.8,75.2L432.6,78.7L433.4,82.2L434.2,83.5L435.0,86.1L435.8,85.2L436.6,83.9L437.4,81.3L438.1,76.5L438.9,76.9L439.7,76.5L440.5,76.5L441.3,71.7L442.1,70.4L442.9,71.7L443.7,71.3L444.5,76.5L445.2,70.0L446.0,68.6L446.8,66.5L447.6,63.4L448.4,59.5L449.2,54.2L450.0,53.8L450.8,56.4L451.6,60.3L452.3,62.1L453.1,58.2L453.9,57.3L454.7,56.8L455.5,57.3L456.3,55.1L457.1,57.3L457.9,56.8L458.6,57.3L459.4,54.2L460.2,62.1L461.0,60.8L461.8,61.2L462.6,60.8L463.4,62.5L464.2,62.1L465.0,64.7L465.7,68.2L466.5,63.0L467.3,66.9L468.1,64.7L468.9,66.0L469.7,65.6L470.5,60.8L471.3,62.1L472.0,62.1L472.8,56.8L473.6,59.5L474.4,59.0L475.2,62.5L476.0,63.4L476.8,62.1L477.6,59.9L478.4,67.3L479.1,70.4L479.9,71.3L480.7,77.8L481.5,76.1L482.3,73.9L483.1,69.1L483.9,69.1L484.7,66.9L485.5,70.4L486.2,73.4L487.0,73.0L487.8,73.0L488.6,69.5L489.4,71.7L490.2,73.9L491.0,73.9L491.8,74.8L492.5,74.3L493.3,77.8L494.1,80.4L494.9,79.1L495.7,73.9L496.5,75.2L497.3,74.8L498.1,72.6L498.9,68.2L499.6,61.7L500.4,64.7L501.2,63.0L502.0,65.6L502.8,68.2L503.6,70.8L504.4,69.5L505.2,72.6L506.0,75.2L506.7,71.3L507.5,70.0L508.3,70.8L509.1,72.1L509.9,68.2L510.7,65.1L511.5,64.7L512.3,67.3L513.0,64.7L513.8,62.5L514.6,62.1L515.4,58.6L516.2,61.2L517.0,59.9L517.8,58.2L518.6,58.6L519.4,57.3L520.1,64.3L520.9,60.8L521.7,71.3L522.5,68.6L523.3,73.9L524.1,72.1L524.9,71.3L525.7,74.8L526.4,70.4L527.2,72.6L528.0,68.6L528.8,63.4L529.6,61.2L530.4,57.7L531.2,54.7L532.0,55.1L532.8,53.8L533.5,50.7L534.3,53.8L535.1,52.0L535.9,51.6L536.7,53.3L537.5,52.5L538.3,49.9L539.1,45.9L539.9,45.5L540.6,46.4L541.4,42.0L542.2,42.9L543.0,41.1L543.8,39.4L544.6,56.8L545.4,52.0L546.2,52.9L546.9,51.6L547.7,50.7L548.5,45.5L549.3,41.1L550.1,40.2L550.9,39.4L551.7,36.7L552.5,38.1L553.3,32.8L554.0,30.6L554.8,26.7L555.6,30.6L556.4,31.5L557.2,33.7L558.0,29.8L558.8,29.3L559.6,25.4L560.4,23.6L561.1,28.4L561.9,32.8L562.7,26.3L563.5,29.3L564.3,24.9L565.1,38.9L565.9,40.7L566.7,34.1L567.4,31.1L568.2,26.7L569.0,21.9L569.8,17.5L570.6,17.1L571.4,15.3L572.2,16.2L573.0,18.0L573.8,19.3L574.5,17.1L575.3,27.6L576.1,23.2L576.9,21.5L577.7,22.3L578.5,18.4L579.3,28.9L580.1,25.4L580.8,33.7L581.6,35.4L582.4,38.5L583.2,42.4L584.0,44.2L584.8,47.2L585.6,44.6L586.4,42.0L587.2,44.6L587.9,43.3L588.7,43.3L589.5,43.3L590.3,43.3L591.1,39.4L591.9,39.4L592.7,40.7L593.5,42.0L594.3,42.0L595.0,43.3L595.8,42.4L596.6,36.7L597.4,36.3L598.2,36.3L599.0,35.9L599.8,32.4L600.6,31.9L601.3,36.7L602.1,32.8L602.9,28.0L603.7,32.4L604.5,37.6L605.3,39.4L606.1,39.8L606.9,44.2L607.7,40.7L608.4,34.6L609.2,33.2L610.0,36.7L610.8,42.0L611.6,38.5L612.4,39.8L613.2,38.1L614.0,38.9L614.8,41.1L615.5,41.6L616.3,39.4L617.1,35.9L617.9,36.7L618.7,42.0L619.5,43.3L620.3,41.1L621.1,39.4L621.8,37.2L622.6,44.6L623.4,49.4L624.2,46.8L625.0,45.0L625.8,47.2L626.6,46.8L627.4,48.1L628.2,45.9L628.9,45.5L629.7,43.7L630.5,41.1L631.3,41.1L632.1,40.2L632.9,37.6L633.7,42.4L634.5,43.3L635.3,43.3L636.0,41.6L636.8,50.7L637.6,49.0L638.4,47.7L639.2,45.0L640.0,44.6L640.8,45.5L641.6,46.4L642.3,41.1L643.1,45.0L643.9,44.2L644.7,52.0L645.5,55.1L646.3,59.5L647.1,63.0L647.9,63.8L648.7,63.4L649.4,62.1L650.2,65.6L651.0,62.5L651.8,63.0L652.6,64.3L653.4,63.4L654.2,64.3L655.0,65.6L655.7,81.8L656.5,81.3L657.3,82.6L658.1,79.6L658.9,78.3L659.7,76.9L660.5,76.1L661.3,77.8L662.1,74.3L662.8,69.5L663.6,68.2L664.4,73.4L665.2,95.7L666.0,98.4L666.8,97.9L667.6,96.2L668.4,94.0L669.2,88.7L669.9,90.1L670.7,86.6L671.5,94.0L672.3,89.2L673.1,84.8L673.9,83.1L674.7,81.8L675.5,76.9L676.2,74.8L677.0,74.3L677.8,73.4L678.6,72.6L679.4,73.0L680.2,75.2L681.0,77.4L681.8,77.4L682.6,78.3L683.3,85.2L684.1,91.4L684.9,87.9L685.7,84.8L686.5,83.1L687.3,82.6L688.1,81.3L688.9,81.3L689.7,83.5L690.4,81.3L691.2,83.9L692.0,81.3L692.8,87.4L693.6,84.8L694.4,82.2L695.2,80.4L696.0,79.6L696.7,74.8L697.5,75.2L698.3,73.9L699.1,75.6L699.9,75.6L700.7,75.6L701.5,79.1L702.3,84.4L703.1,87.0L703.8,88.3L704.6,91.8L705.4,89.2L706.2,89.6L707.0,89.6L707.8,87.4L708.6,83.1L709.4,82.2L710.1,80.0L710.9,85.7L711.7,86.6L712.5,91.8L713.3,90.1L714.1,92.7L714.9,91.4L715.7,88.3L716.5,88.7L717.2,88.7L718.0,90.1L718.8,90.5L719.6,88.7L720.4,87.9L721.2,89.2L722.0,88.7L722.8,87.4L723.6,87.9L724.3,90.5L725.1,87.9L725.9,90.1L726.7,87.9L727.5,90.5L728.3,90.1L729.1,89.6L729.9,91.4L730.6,92.2L731.4,91.8L732.2,96.6L733.0,94.4L733.8,94.9L734.6,92.7L735.4,93.5L736.2,93.1L737.0,91.8L737.7,96.6L738.5,95.7L739.3,93.5L740.1,92.7L740.9,93.5L741.7,104.0L742.5,104.0L743.3,108.4L744.1,106.7L744.8,107.5L745.6,110.2L746.4,111.9L747.2,111.9L748.0,112.3L748.8,113.6L749.6,113.6L750.4,114.1L751.1,114.5L751.9,115.8L752.7,117.6L753.5,116.7L754.3,115.8L755.1,115.4L755.9,113.6L756.7,114.1L757.5,115.8L758.2,115.4L759.0,113.6L759.8,112.3L760.6,114.1L761.4,113.6L762.2,111.9L763.0,111.9L763.8,112.3L764.5,113.2L765.3,110.6L766.1,109.3L766.9,111.5L767.7,110.6L768.5,109.7L769.3,111.9L770.1,111.9L770.9,113.6L771.6,114.5L772.4,115.4L773.2,115.8L774.0,118.9L774.8,118.5L775.6,119.8L776.4,120.2L777.2,119.3L778.0,122.4L778.7,122.4L779.5,124.6L780.3,123.3L781.1,122.0L781.9,121.1L782.7,120.2L783.5,122.4L784.3,122.0L785.0,120.6L785.8,120.2L786.6,119.3L787.4,121.1L788.2,121.5L789.0,121.1L789.8,119.3L790.6,118.9L791.4,117.6L792.1,121.5L792.9,121.5L793.7,123.3L794.5,123.7L795.3,123.7L796.1,122.8L796.9,123.3L797.7,123.7L798.5,122.0L799.2,119.8L800.0,120.2L800.8,120.6L801.6,120.2L802.4,119.3L803.2,118.9L804.0,119.3L804.8,119.8L805.5,119.8L806.3,119.3L807.1,118.0L807.9,118.5L808.7,121.1L809.5,118.9L810.3,117.1L811.1,116.3L811.9,118.9L812.6,116.3L813.4,116.3L814.2,114.5L815.0,112.8L815.8,114.5L816.6,112.3L817.4,114.5L818.2,114.5L818.9,111.9L819.7,112.8L820.5,114.1L821.3,113.6L822.1,113.6L822.9,113.6L823.7,114.5L824.5,115.4L825.3,114.5L826.0,114.5L826.8,115.0L827.6,115.8L828.4,116.3L829.2,116.3L830.0,115.8L830.8,115.8L831.6,115.4L832.4,118.0L833.1,118.0L833.9,116.7L834.7,116.7L835.5,120.2L836.3,119.8L837.1,119.8L837.9,120.2L838.7,119.3L839.4,117.1L840.2,119.8L841.0,119.8L841.8,118.0L842.6,118.0L843.4,117.6L844.2,117.6L845.0,116.3L845.8,117.6L846.5,116.7L847.3,117.6L848.1,117.6L848.9,117.1L849.7,115.8L850.5,116.3L851.3,119.8L852.1,118.9L852.9,119.3L853.6,119.3L854.4,118.5L855.2,117.6L856.0,118.5L856.8,119.3L857.6,118.5L858.4,119.3L859.2,119.8L859.9,119.3L860.7,118.9L861.5,118.5L862.3,119.3L863.1,117.6L863.9,116.7L864.7,115.4L865.5,116.7L866.3,116.7L867.0,116.3L867.8,117.1L868.6,116.3L869.4,117.1L870.2,116.7L871.0,116.7L871.8,117.1L872.6,117.6L873.4,117.6L874.1,117.6L874.9,117.1L875.7,118.5L876.5,116.7L877.3,116.3L878.1,115.8L878.9,119.8L879.7,118.9L880.4,120.6L881.2,120.6L882.0,120.6L882.8,121.1L883.6,121.5L884.4,119.8L885.2,120.2L886.0,119.3L886.8,118.9L887.5,117.1L888.3,116.7L889.1,118.0L889.9,118.9L890.7,119.3L891.5,118.9L892.3,118.9L893.1,118.0L893.8,118.9L894.6,118.0L895.4,118.9L896.2,118.5L897.0,119.3L897.8,118.9L898.6,118.5L899.4,119.8L900.2,121.1L900.9,121.1L901.7,121.5L902.5,123.3L903.3,122.8L904.1,122.8L904.9,122.8L905.7,122.0L906.5,123.7L907.3,123.7L908.0,122.8L908.8,123.7L909.6,123.7L910.4,123.7L911.2,124.1L912.0,123.7L912.8,123.3L913.6,124.1L914.3,123.3L915.1,123.7L915.9,124.6L916.7,124.6L917.5,124.1L918.3,124.6L919.1,124.1L919.9,123.7L920.7,123.3L921.4,123.7L922.2,123.3L923.0,125.4L923.8,124.6L924.6,124.6L925.4,125.0L926.2,125.0L927.0,124.1L927.8,123.3L928.5,125.0L929.3,125.9L930.1,126.3L930.9,127.2L931.7,128.1L932.5,127.6L933.3,127.2L934.1,126.3L934.8,127.2L935.6,127.6L936.4,127.2L937.2,128.9L938.0,128.9" fill="none" stroke="#7f89a3" stroke-width="1.5"></path><path d="M40.0,127.6L40.8,127.6L41.6,126.8L42.4,126.3L43.2,126.3L43.9,126.3L44.7,125.4L45.5,125.0L46.3,124.6L47.1,124.6L47.9,124.1L48.7,124.1L49.5,123.3L50.2,123.3L51.0,123.7L51.8,123.7L52.6,123.7L53.4,122.8L54.2,122.8L55.0,122.4L55.8,122.0L56.6,120.6L57.3,121.5L58.1,120.6L58.9,124.1L59.7,124.6L60.5,124.6L61.3,124.6L62.1,125.4L62.9,125.9L63.7,124.6L64.4,122.8L65.2,124.1L66.0,123.7L66.8,124.1L67.6,124.6L68.4,124.1L69.2,125.0L70.0,124.6L70.7,125.0L71.5,124.6L72.3,124.6L73.1,124.1L73.9,124.1L74.7,123.7L75.5,123.3L76.3,123.3L77.1,124.1L77.8,125.0L78.6,125.4L79.4,125.4L80.2,125.4L81.0,124.6L81.8,124.1L82.6,125.4L83.4,123.7L84.2,124.1L84.9,123.7L85.7,124.1L86.5,124.6L87.3,124.6L88.1,123.7L88.9,122.0L89.7,120.2L90.5,120.6L91.2,120.2L92.0,120.6L92.8,120.6L93.6,121.1L94.4,120.2L95.2,118.5L96.0,118.5L96.8,118.9L97.6,118.5L98.3,116.7L99.1,117.6L99.9,116.7L100.7,115.0L101.5,112.8L102.3,111.0L103.1,111.0L103.9,112.8L104.6,111.5L105.4,113.2L106.2,116.7L107.0,113.6L107.8,112.3L108.6,111.9L109.4,112.8L110.2,113.2L111.0,114.1L111.7,115.4L112.5,114.1L113.3,114.1L114.1,112.8L114.9,113.6L115.7,113.6L116.5,112.8L117.3,111.5L118.1,111.5L118.8,111.0L119.6,111.0L120.4,112.3L121.2,111.0L122.0,112.8L122.8,112.3L123.6,109.3L124.4,108.4L125.1,111.0L125.9,108.8L126.7,108.8L127.5,109.3L128.3,108.4L129.1,111.5L129.9,111.9L130.7,111.9L131.5,113.6L132.2,114.1L133.0,112.8L133.8,111.5L134.6,112.3L135.4,111.5L136.2,110.2L137.0,108.0L137.8,105.8L138.6,107.5L139.3,106.7L140.1,106.2L140.9,106.2L141.7,103.2L142.5,101.9L143.3,99.2L144.1,98.8L144.9,97.9L145.6,100.5L146.4,99.7L147.2,102.3L148.0,97.9L148.8,99.7L149.6,98.4L150.4,99.7L151.2,97.0L152.0,97.5L152.7,95.7L153.5,96.6L154.3,94.0L155.1,95.7L155.9,94.4L156.7,95.7L157.5,98.4L158.3,101.4L159.1,104.5L159.8,102.3L160.6,101.4L161.4,99.2L162.2,98.4L163.0,100.5L163.8,97.9L164.6,98.8L165.4,100.5L166.1,99.7L166.9,103.6L167.7,98.8L168.5,101.0L169.3,100.1L170.1,100.5L170.9,99.2L171.7,99.7L172.5,100.1L173.2,100.1L174.0,100.1L174.8,96.2L175.6,98.8L176.4,98.8L177.2,98.4L178.0,98.4L178.8,98.8L179.5,105.3L180.3,101.9L181.1,101.0L181.9,101.0L182.7,101.4L183.5,100.5L184.3,98.4L185.1,104.0L185.9,102.7L186.6,100.1L187.4,103.6L188.2,105.3L189.0,106.2L189.8,108.4L190.6,109.7L191.4,110.2L192.2,111.5L193.0,112.8L193.7,110.6L194.5,109.3L195.3,105.3L196.1,104.9L196.9,106.7L197.7,108.8L198.5,108.4L199.3,111.5L200.0,109.7L200.8,108.4L201.6,108.4L202.4,107.1L203.2,106.7L204.0,103.6L204.8,105.8L205.6,103.6L206.4,102.7L207.1,104.5L207.9,105.3L208.7,105.8L209.5,104.5L210.3,102.7L211.1,101.4L211.9,101.4L212.7,98.4L213.5,99.7L214.2,100.5L215.0,105.8L215.8,107.1L216.6,109.7L217.4,109.7L218.2,109.3L219.0,110.6L219.8,114.1L220.5,114.5L221.3,113.2L222.1,113.6L222.9,111.9L223.7,112.3L224.5,111.9L225.3,111.0L226.1,111.9L226.9,111.5L227.6,110.6L228.4,109.7L229.2,109.7L230.0,107.1L230.8,108.8L231.6,108.4L232.4,107.5L233.2,110.6L233.9,109.7L234.7,106.2L235.5,107.5L236.3,108.0L237.1,108.0L237.9,107.1L238.7,104.9L239.5,102.7L240.3,104.9L241.0,103.6L241.8,101.9L242.6,100.1L243.4,100.5L244.2,98.8L245.0,98.8L245.8,101.4L246.6,99.7L247.4,97.5L248.1,100.5L248.9,100.1L249.7,99.2L250.5,102.3L251.3,102.3L252.1,102.3L252.9,101.0L253.7,100.1L254.4,101.0L255.2,99.7L256.0,99.2L256.8,101.0L257.6,103.2L258.4,103.6L259.2,102.3L260.0,101.4L260.8,101.9L261.5,104.0L262.3,105.8L263.1,104.9L263.9,102.3L264.7,102.3L265.5,101.0L266.3,101.0L267.1,105.8L267.9,104.5L268.6,101.4L269.4,104.5L270.2,108.8L271.0,109.3L271.8,105.8L272.6,105.8L273.4,106.7L274.2,107.5L274.9,106.7L275.7,109.3L276.5,107.1L277.3,105.8L278.1,107.5L278.9,116.7L279.7,116.3L280.5,118.9L281.3,115.0L282.0,113.2L282.8,111.9L283.6,113.6L284.4,112.3L285.2,110.6L286.0,113.2L286.8,109.3L287.6,107.5L288.3,108.0L289.1,108.8L289.9,108.8L290.7,109.3L291.5,111.0L292.3,109.3L293.1,110.6L293.9,109.7L294.7,110.6L295.4,112.3L296.2,110.6L297.0,110.6L297.8,111.9L298.6,109.7L299.4,109.7L300.2,111.0L301.0,108.4L301.8,110.2L302.5,112.3L303.3,111.9L304.1,115.8L304.9,115.8L305.7,115.0L306.5,113.6L307.3,112.3L308.1,111.9L308.8,111.0L309.6,109.3L310.4,109.7L311.2,111.9L312.0,112.3L312.8,111.0L313.6,109.7L314.4,107.5L315.2,114.5L315.9,115.0L316.7,112.3L317.5,114.1L318.3,112.8L319.1,113.6L319.9,112.8L320.7,114.1L321.5,111.0L322.3,110.2L323.0,107.1L323.8,108.0L324.6,104.9L325.4,103.2L326.2,102.7L327.0,101.4L327.8,103.2L328.6,103.6L329.3,102.7L330.1,100.1L330.9,101.9L331.7,101.0L332.5,100.1L333.3,98.8L334.1,101.0L334.9,96.6L335.7,101.4L336.4,100.1L337.2,96.2L338.0,96.2L338.8,98.8L339.6,97.5L340.4,99.2L341.2,98.4L342.0,97.9L342.7,96.2L343.5,93.5L344.3,94.9L345.1,93.1L345.9,93.1L346.7,94.4L347.5,97.0L348.3,97.5L349.1,97.0L349.8,94.0L350.6,92.7L351.4,95.7L352.2,93.5L353.0,93.1L353.8,89.2L354.6,89.6L355.4,87.4L356.2,87.0L356.9,87.0L357.7,86.1L358.5,86.1L359.3,86.6L360.1,82.6L360.9,82.6L361.7,82.2L362.5,81.8L363.2,83.5L364.0,81.8L364.8,83.5L365.6,82.2L366.4,80.9L367.2,80.4L368.0,78.3L368.8,82.2L369.6,80.9L370.3,82.6L371.1,82.6L371.9,102.7L372.7,98.4L373.5,101.4L374.3,101.0L375.1,95.7L375.9,94.9L376.7,95.3L377.4,90.9L378.2,97.0L379.0,91.4L379.8,89.6L380.6,87.0L381.4,87.4L382.2,86.6L383.0,85.2L383.7,80.0L384.5,83.5L385.3,83.1L386.1,83.1L386.9,83.5L387.7,81.8L388.5,87.4L389.3,87.9L390.1,90.5L390.8,88.3L391.6,87.4L392.4,87.0L393.2,81.8L394.0,86.6L394.8,82.2L395.6,82.6L396.4,80.9L397.2,82.6L397.9,83.9L398.7,80.9L399.5,83.5L400.3,82.2L401.1,83.1L401.9,83.9L402.7,82.2L403.5,80.4L404.2,83.5L405.0,84.4L405.8,85.7L406.6,87.4L407.4,86.6L408.2,87.0L409.0,87.9L409.8,87.0L410.6,86.6L411.3,84.4L412.1,85.2L412.9,82.6L413.7,83.1L414.5,82.2L415.3,80.0L416.1,80.4L416.9,78.7L417.6,93.5L418.4,89.6L419.2,98.4L420.0,93.5L420.8,93.1L421.6,90.5L422.4,92.7L423.2,88.7L424.0,95.7L424.7,94.4L425.5,101.4L426.3,99.2L427.1,99.2L427.9,97.0L428.7,97.9L429.5,97.9L430.3,95.7L431.1,95.7L431.8,91.8L432.6,93.5L433.4,86.6L434.2,87.4L435.0,87.0L435.8,91.8L436.6,89.6L437.4,89.2L438.1,86.1L438.9,88.7L439.7,88.7L440.5,87.0L441.3,85.2L442.1,84.4L442.9,82.6L443.7,84.8L444.5,87.4L445.2,83.9L446.0,80.4L446.8,80.0L447.6,75.6L448.4,73.0L449.2,74.3L450.0,71.7L450.8,72.6L451.6,75.6L452.3,76.1L453.1,71.3L453.9,72.1L454.7,71.3L455.5,67.3L456.3,70.4L457.1,70.0L457.9,71.7L458.6,78.7L459.4,75.6L460.2,76.9L461.0,74.8L461.8,71.3L462.6,70.4L463.4,70.8L464.2,70.8L465.0,70.8L465.7,73.4L466.5,69.5L467.3,67.3L468.1,69.1L468.9,70.8L469.7,66.9L470.5,67.3L471.3,66.0L472.0,64.7L472.8,63.0L473.6,60.3L474.4,64.3L475.2,66.5L476.0,67.8L476.8,66.9L477.6,64.7L478.4,72.6L479.1,75.2L479.9,74.3L480.7,79.6L481.5,76.1L482.3,75.2L483.1,75.2L483.9,73.0L484.7,71.3L485.5,78.7L486.2,79.1L487.0,78.7L487.8,80.4L488.6,76.9L489.4,76.1L490.2,75.2L491.0,72.1L491.8,72.1L492.5,73.0L493.3,76.1L494.1,79.1L494.9,80.4L495.7,75.6L496.5,74.8L497.3,76.9L498.1,78.7L498.9,76.1L499.6,72.1L500.4,77.8L501.2,75.2L502.0,77.8L502.8,76.1L503.6,78.3L504.4,76.9L505.2,80.0L506.0,74.8L506.7,71.3L507.5,72.6L508.3,72.6L509.1,75.2L509.9,74.8L510.7,72.1L511.5,75.6L512.3,80.0L513.0,76.5L513.8,76.9L514.6,73.4L515.4,75.2L516.2,75.6L517.0,71.7L517.8,72.1L518.6,66.9L519.4,66.0L520.1,63.0L520.9,69.5L521.7,73.4L522.5,75.2L523.3,73.9L524.1,71.7L524.9,73.9L525.7,76.9L526.4,73.9L527.2,76.9L528.0,79.1L528.8,79.6L529.6,75.6L530.4,72.6L531.2,69.5L532.0,78.7L532.8,76.5L533.5,75.6L534.3,78.3L535.1,76.1L535.9,77.8L536.7,73.9L537.5,73.9L538.3,68.2L539.1,68.2L539.9,71.3L540.6,67.8L541.4,63.0L542.2,60.3L543.0,59.5L543.8,64.3L544.6,71.3L545.4,70.0L546.2,72.1L546.9,70.8L547.7,70.0L548.5,69.1L549.3,64.7L550.1,66.0L550.9,63.0L551.7,60.3L552.5,65.6L553.3,59.0L554.0,58.6L554.8,55.5L555.6,57.3L556.4,58.6L557.2,57.7L558.0,54.7L558.8,60.8L559.6,55.5L560.4,52.0L561.1,53.3L561.9,55.1L562.7,49.0L563.5,58.6L564.3,57.3L565.1,65.1L565.9,63.8L566.7,60.3L567.4,61.2L568.2,55.5L569.0,57.7L569.8,57.7L570.6,58.6L571.4,55.1L572.2,55.5L573.0,54.2L573.8,55.1L574.5,52.5L575.3,56.0L576.1,52.9L576.9,53.8L577.7,50.3L578.5,49.0L579.3,51.2L580.1,52.0L580.8,56.8L581.6,55.5L582.4,53.3L583.2,62.1L584.0,60.8L584.8,61.2L585.6,60.8L586.4,60.3L587.2,62.1L587.9,58.6L588.7,58.6L589.5,59.0L590.3,56.8L591.1,53.8L591.9,50.7L592.7,48.5L593.5,52.0L594.3,51.6L595.0,52.0L595.8,49.9L596.6,47.7L597.4,44.2L598.2,42.4L599.0,43.7L599.8,42.9L600.6,39.8L601.3,42.4L602.1,38.9L602.9,41.1L603.7,45.0L604.5,45.9L605.3,46.4L606.1,50.7L606.9,51.2L607.7,49.4L608.4,42.4L609.2,38.9L610.0,42.0L610.8,46.4L611.6,46.8L612.4,45.0L613.2,49.0L614.0,49.9L614.8,49.9L615.5,50.3L616.3,48.5L617.1,48.5L617.9,48.1L618.7,51.6L619.5,49.4L620.3,48.1L621.1,47.2L621.8,43.7L622.6,47.7L623.4,50.3L624.2,52.9L625.0,51.2L625.8,51.2L626.6,48.5L627.4,54.2L628.2,52.5L628.9,47.7L629.7,46.4L630.5,58.2L631.3,57.7L632.1,53.8L632.9,52.9L633.7,58.2L634.5,57.3L635.3,52.9L636.0,49.0L636.8,45.9L637.6,45.9L638.4,45.5L639.2,46.4L640.0,49.9L640.8,47.2L641.6,51.2L642.3,46.4L643.1,45.0L643.9,47.2L644.7,48.5L645.5,47.7L646.3,49.9L647.1,54.2L647.9,54.2L648.7,54.2L649.4,49.4L650.2,58.6L651.0,58.6L651.8,55.1L652.6,53.3L653.4,53.3L654.2,54.2L655.0,52.9L655.7,54.2L656.5,57.7L657.3,52.9L658.1,49.4L658.9,48.5L659.7,46.8L660.5,48.5L661.3,72.1L662.1,73.4L662.8,72.1L663.6,71.3L664.4,73.0L665.2,75.6L666.0,76.9L666.8,72.6L667.6,73.4L668.4,71.7L669.2,94.9L669.9,96.6L670.7,94.9L671.5,97.9L672.3,94.0L673.1,91.4L673.9,91.8L674.7,90.9L675.5,87.0L676.2,88.3L677.0,86.6L677.8,87.4L678.6,90.5L679.4,92.7L680.2,92.2L681.0,92.2L681.8,92.7L682.6,93.5L683.3,95.3L684.1,94.4L684.9,94.4L685.7,89.2L686.5,89.2L687.3,91.4L688.1,89.2L688.9,92.7L689.7,94.4L690.4,96.2L691.2,91.8L692.0,90.9L692.8,94.9L693.6,92.2L694.4,90.1L695.2,87.4L696.0,87.9L696.7,87.9L697.5,86.6L698.3,89.6L699.1,89.6L699.9,87.9L700.7,85.7L701.5,84.4L702.3,84.8L703.1,84.4L703.8,86.6L704.6,87.0L705.4,84.4L706.2,86.6L707.0,87.0L707.8,89.2L708.6,85.7L709.4,86.1L710.1,87.0L710.9,90.9L711.7,88.7L712.5,85.7L713.3,83.9L714.1,84.4L714.9,83.5L715.7,81.8L716.5,80.0L717.2,82.2L718.0,84.4L718.8,90.5L719.6,88.3L720.4,86.6L721.2,83.9L722.0,81.3L722.8,79.6L723.6,82.2L724.3,82.6L725.1,82.6L725.9,83.9L726.7,83.1L727.5,83.5L728.3,79.6L729.1,82.2L729.9,82.2L730.6,83.5L731.4,87.9L732.2,88.7L733.0,88.7L733.8,93.1L734.6,90.9L735.4,88.7L736.2,92.7L737.0,91.4L737.7,94.0L738.5,96.2L739.3,96.2L740.1,94.4L740.9,95.7L741.7,94.0L742.5,94.4L743.3,95.3L744.1,94.0L744.8,93.5L745.6,95.7L746.4,97.0L747.2,114.1L748.0,113.2L748.8,113.2L749.6,114.5L750.4,116.3L751.1,115.0L751.9,117.1L752.7,118.0L753.5,119.8L754.3,120.2L755.1,120.6L755.9,119.3L756.7,118.9L757.5,118.9L758.2,118.5L759.0,118.0L759.8,116.7L760.6,120.2L761.4,120.2L762.2,119.3L763.0,118.0L763.8,117.6L764.5,118.0L765.3,114.5L766.1,114.1L766.9,115.8L767.7,116.7L768.5,116.7L769.3,117.6L770.1,115.8L770.9,117.1L771.6,117.1L772.4,117.6L773.2,118.0L774.0,120.6L774.8,120.2L775.6,121.1L776.4,122.4L777.2,122.4L778.0,123.7L778.7,124.6L779.5,125.4L780.3,124.6L781.1,123.7L781.9,123.7L782.7,123.3L783.5,124.1L784.3,123.3L785.0,122.4L785.8,122.0L786.6,122.0L787.4,123.7L788.2,123.7L789.0,122.8L789.8,121.1L790.6,121.5L791.4,119.8L792.1,121.5L792.9,122.4L793.7,124.1L794.5,124.1L795.3,125.0L796.1,124.1L796.9,122.8L797.7,122.8L798.5,120.6L799.2,118.5L800.0,118.9L800.8,118.9L801.6,118.9L802.4,118.5L803.2,119.3L804.0,120.2L804.8,122.0L805.5,121.1L806.3,120.2L807.1,118.0L807.9,117.6L808.7,117.6L809.5,115.4L810.3,115.0L811.1,114.1L811.9,114.1L812.6,111.5L813.4,111.9L814.2,113.6L815.0,111.9L815.8,111.5L816.6,110.6L817.4,116.7L818.2,115.4L818.9,112.8L819.7,114.5L820.5,114.5L821.3,116.3L822.1,115.4L822.9,115.8L823.7,117.1L824.5,117.1L825.3,116.3L826.0,117.1L826.8,115.8L827.6,117.1L828.4,118.0L829.2,118.5L830.0,117.6L830.8,116.7L831.6,116.7L832.4,119.8L833.1,119.8L833.9,119.3L834.7,119.8L835.5,121.1L836.3,121.5L837.1,121.1L837.9,122.0L838.7,120.6L839.4,118.5L840.2,119.8L841.0,119.8L841.8,119.3L842.6,118.5L843.4,118.9L844.2,119.3L845.0,117.6L845.8,118.9L846.5,119.8L847.3,119.3L848.1,118.5L848.9,118.5L849.7,117.1L850.5,118.0L851.3,119.8L852.1,118.0L852.9,116.7L853.6,116.7L854.4,115.8L855.2,116.3L856.0,118.0L856.8,118.0L857.6,118.5L858.4,118.5L859.2,120.2L859.9,119.3L860.7,118.9L861.5,118.0L862.3,119.3L863.1,120.6L863.9,120.6L864.7,118.9L865.5,119.3L866.3,119.3L867.0,118.0L867.8,118.9L868.6,118.5L869.4,118.9L870.2,118.9L871.0,119.3L871.8,119.3L872.6,120.2L873.4,122.0L874.1,122.4L874.9,122.0L875.7,122.8L876.5,121.1L877.3,120.6L878.1,120.2L878.9,123.3L879.7,122.4L880.4,122.4L881.2,122.0L882.0,122.4L882.8,123.3L883.6,123.7L884.4,122.0L885.2,122.0L886.0,121.1L886.8,122.0L887.5,120.2L888.3,120.6L889.1,121.1L889.9,120.2L890.7,120.6L891.5,120.6L892.3,120.6L893.1,119.8L893.8,119.8L894.6,118.9L895.4,120.2L896.2,120.6L897.0,121.5L897.8,121.1L898.6,120.6L899.4,122.0L900.2,122.4L900.9,122.4L901.7,122.4L902.5,122.4L903.3,122.4L904.1,122.0L904.9,121.5L905.7,121.1L906.5,123.3L907.3,123.7L908.0,123.3L908.8,124.6L909.6,125.0L910.4,124.6L911.2,124.1L912.0,124.1L912.8,123.3L913.6,124.1L914.3,123.7L915.1,123.7L915.9,124.1L916.7,125.0L917.5,125.4L918.3,125.4L919.1,125.0L919.9,124.6L920.7,124.1L921.4,123.3L922.2,125.9L923.0,126.3L923.8,125.0L924.6,125.4L925.4,125.4L926.2,125.0L927.0,125.0L927.8,124.6L928.5,125.0L929.3,125.9L930.1,126.3L930.9,127.2L931.7,126.8L932.5,126.8L933.3,127.2L934.1,127.2L934.8,128.1L935.6,127.6L936.4,127.6L937.2,127.2L938.0,128.5" fill="none" stroke="#7fb2ff" stroke-width="2"></path><line y1="6" y2="132" stroke="#ffffff" stroke-width="1.2" x1="110.95697980684811" x2="110.95697980684811"></line><rect x="40" y="0" width="904" height="150" fill="transparent" style="cursor:ew-resize"></rect></svg></div>
+    </div>
+  </section>
+</div>
+<div id="fin"><div class="box" id="finbox"></div></div>
+<div id="start"><div style="text-align:center"><button id="go">▶ Iniciar animación</button>
+  <p>Izquierda: cómo funciona hoy (simulado para reproducir lo que pasó en agosto). Derecha: el mismo día con pausas cortas para emparejar los ómnibus.
+  Mirá cómo se juntan los buses, cómo se llenan las paradas y cuáles van apretados.</p></div></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (x, d = 0) => x == null || !isFinite(x) ? '–' : x.toLocaleString('es-UY', { minimumFractionDigits: d, maximumFractionDigits: d });
+const hhmm = s => `${String(Math.floor(s / 3600) % 24).padStart(2, '0')}:${String(Math.floor(s % 3600 / 60)).padStart(2, '0')}`;
+const PLAY = '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.5v9l7.5-4.5z" fill="currentColor"/></svg>';
+const PAUSE = '<svg width="12" height="12" viewBox="0 0 12 12"><rect x="2.5" y="1.5" width="2.5" height="9" rx="1" fill="currentColor"/><rect x="7" y="1.5" width="2.5" height="9" rx="1" fill="currentColor"/></svg>';
+const S = { T: 6.5 * 3600, speed: 180, playing: false };
+let D, IDX, IMP, maps = {}, km = [], serie = {}, acum = {}, finMostrado = false;
+
+function cosl() { return Math.cos(-34.88 * Math.PI / 180); }
+function prep() {
+  const P = D.paradas; km = [0];
+  for (let i = 1; i < P.length; i++) km.push(km[i - 1] + Math.hypot((P[i][0] - P[i - 1][0]) * 111320 * cosl(), (P[i][1] - P[i - 1][1]) * 110540));
+  for (const e of ['sin_control', 'decisor_final']) {
+    const E = D.estrategias[e], nb = E.esperando[0].length;
+    const s = new Float64Array(nb), a = new Float64Array(nb);
+    for (let m = 0; m < nb; m++) { let t = 0; for (const row of E.esperando) t += row[m]; s[m] = t; a[m] = (m ? a[m - 1] : 0) + t * D.paso / 3600; }
+    serie[e] = s; acum[e] = a;
+  }
+}
+
+// posición de cada bus en el instante T
+function buses(e, T) {
+  const E = D.estrategias[e], P = D.paradas, out = [];
+  for (let k = 0; k < E.lleg.length; k++) {
+    const L = E.lleg[k], Sa = E.sale[k];
+    let first = -1, last = -1;
+    for (let i = 0; i < L.length; i++) if (L[i] >= 0) { if (first < 0) first = i; last = i; }
+    if (first < 0 || T < L[first] || T > Sa[last]) continue;
+    let j = first;
+    for (let i = first; i <= last; i++) if (L[i] >= 0 && L[i] <= T) j = i;
+    let pos, prog, pausa = false;
+    if (T <= Sa[j] || j === last) {
+      pos = P[j]; prog = km[j];
+      pausa = E.reten[k][j] > 0 && T > Sa[j] - E.reten[k][j];
+    } else {
+      let j2 = j + 1; while (j2 <= last && L[j2] < 0) j2++;
+      const f = Math.max(0, Math.min(1, (T - Sa[j]) / Math.max(L[j2] - Sa[j], 1)));
+      pos = [P[j][0] + (P[j2][0] - P[j][0]) * f, P[j][1] + (P[j2][1] - P[j][1]) * f]; prog = km[j] + (km[j2] - km[j]) * f;
+    }
+    out.push({ k, pos, prog, carga: Math.max(E.carga[k][j], 0), pausa, peg: false });
+  }
+  out.sort((a, b) => a.prog - b.prog);
+  for (let i = 1; i < out.length; i++) if (out[i].prog - out[i - 1].prog < 250) { out[i].peg = out[i - 1].peg = true; }
+  return out;
+}
+
+function pintar() {
+  if (!D || !serie.sin_control) return;
+  const T = S.T, m = Math.max(0, Math.min(serie.sin_control.length - 1, Math.floor((T - D.t0) / D.paso)));
+  for (const [e, id, kid] of [['sin_control', 'A', 'kA'], ['decisor_final', 'B', 'kB']]) {
+    const map = maps[id]; if (!map.getSource('buses')) continue;
+    const bs = buses(e, T), E = D.estrategias[e];
+    map.getSource('buses').setData({ type: 'FeatureCollection', features: bs.map(b => ({ type: 'Feature', geometry: { type: 'Point', coordinates: b.pos },
+      properties: { c: b.carga, peg: b.peg ? 1 : 0, pausa: b.pausa ? 1 : 0 } })) });
+    map.getSource('paradas').setData({ type: 'FeatureCollection', features: D.paradas.map((p, i) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: p },
+      properties: { w: E.esperando[i][m] } })) });
+    $(kid).innerHTML = `
+      <div class="kpi glass"><div class="v">${fmt(serie[e][m])}</div><div class="k">esperando ahora</div></div>
+      <div class="kpi glass"><div class="v" style="color:${bs.some(b => b.carga > 60) ? 'var(--est)' : 'inherit'}">${bs.filter(b => b.carga > 60).length}</div><div class="k">buses apretados</div></div>
+      <div class="kpi glass"><div class="v" style="color:${bs.some(b => b.peg) ? 'var(--peg)' : 'inherit'}">${bs.filter(b => b.peg).length}</div><div class="k">buses pegados</div></div>
+      <div class="kpi glass"><div class="v">${fmt(acum[e][m])} h</div><div class="k">espera acumulada</div></div>`;
+  }
+  $('clock').textContent = hhmm(T);
+  $('ahorro').textContent = `${fmt(acum.sin_control[m] - acum.decisor_final[m])} h`;
+  cursor(m);
+}
+
+let G = null;
+function chart() {
+  const box = $('chart'), W = box.clientWidth, H = box.clientHeight; if (W < 80 || H < 40) return;
+  const a = serie.sin_control, b = serie.decisor_final, n = a.length, max = Math.max(...a, ...b) * 1.08;
+  const pl = 40, pb = 18, pt = 6, x = m => pl + (W - pl - 6) * m / (n - 1), y = v => pt + (H - pt - pb) * (1 - v / max);
+  box.innerHTML = '';
+  const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); box.appendChild(svg);
+  const el = (t, at) => { const e = document.createElementNS(ns, t); for (const k in at) e.setAttribute(k, at[k]); svg.appendChild(e); return e; };
+  const step = max > 1000 ? 500 : max > 400 ? 200 : 100;
+  for (let v = 0; v <= max; v += step) { el('line', { x1: pl, x2: W, y1: y(v), y2: y(v), stroke: 'rgba(255,255,255,.07)' }); el('text', { x: pl - 6, y: y(v) + 3.5, 'text-anchor': 'end', class: 'axis', fill: '#7c7b74', 'font-size': 10.5 }).textContent = fmt(v); }
+  for (let h = 6; h <= 24; h += 2) { const m = (h * 3600 - D.t0) / D.paso; el('text', { x: x(m), y: H - 3, 'text-anchor': 'middle', fill: '#7c7b74', 'font-size': 10.5 }).textContent = `${h}h`; }
+  const path = s => Array.from(s).map((v, m) => `${m ? 'L' : 'M'}${x(m).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  el('path', { d: path(a), fill: 'none', stroke: '#7f89a3', 'stroke-width': 1.5 });
+  el('path', { d: path(b), fill: 'none', stroke: '#7fb2ff', 'stroke-width': 2 });
+  G = { cur: el('line', { y1: pt, y2: H - pb, stroke: '#ffffff', 'stroke-width': 1.2 }), x };
+  const hit = el('rect', { x: pl, y: 0, width: W - pl, height: H, fill: 'transparent', style: 'cursor:ew-resize' });
+  let drag = false;
+  const tAt = ev => D.t0 + Math.max(0, Math.min(n - 1, (ev.offsetX - pl) / (W - pl - 6) * (n - 1))) * D.paso;
+  hit.onpointerdown = ev => { drag = true; hit.setPointerCapture(ev.pointerId); S.T = tAt(ev); pintar(); };
+  hit.onpointermove = ev => { if (drag) { S.T = tAt(ev); pintar(); } };
+  hit.onpointerup = () => drag = false;
+}
+function cursor(m) { if (G) { G.cur.setAttribute('x1', G.x(m)); G.cur.setAttribute('x2', G.x(m)); } }
+
+function crearMapa(id) {
+  return new Promise(res => {
+    const map = new maplibregl.Map({ container: 'map' + id, style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json', center: [-56.17, -34.87], zoom: 12, attributionControl: { compact: true } });
+    map.on('load', () => {
+      map.addSource('ruta', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('paradas', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('buses', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({ id: 'ruta', type: 'line', source: 'ruta', paint: { 'line-color': '#6b6b72', 'line-width': 2.5, 'line-opacity': 0.35 } });
+      map.addLayer({ id: 'paradas', type: 'circle', source: 'paradas', paint: {
+        'circle-radius': ['interpolate', ['linear'], ['get', 'w'], 0, 1.5, 5, 4, 20, 9, 60, 16],
+        'circle-color': 'rgba(227,192,106,.55)', 'circle-stroke-width': 0 } });
+      map.addLayer({ id: 'halo', type: 'circle', source: 'buses', paint: {
+        'circle-radius': 11, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-width': 2.5,
+        'circle-stroke-color': ['case', ['==', ['get', 'pausa'], 1], '#e3c06a', ['==', ['get', 'peg'], 1], '#e5735f', 'rgba(0,0,0,0)'] } });
+      map.addLayer({ id: 'buses', type: 'circle', source: 'buses', paint: {
+        'circle-radius': 6.5, 'circle-stroke-color': '#0e0e10', 'circle-stroke-width': 1.2,
+        'circle-color': ['case', ['>', ['get', 'c'], 60], '#e8894a', ['interpolate', ['linear'], ['get', 'c'], 0, '#1d4ed8', 20, '#0ea5e9', 40, '#7dd3fc', 60, '#e0f2fe']] } });
+      res(map);
+    });
+  });
+}
+let sync = false;
+function sincronizar() {
+  const a = maps.A, b = maps.B;
+  const mv = (src, dst) => () => { if (sync) return; sync = true; dst.jumpTo({ center: src.getCenter(), zoom: src.getZoom(), bearing: src.getBearing(), pitch: src.getPitch() }); sync = false; };
+  a.on('move', mv(a, b)); b.on('move', mv(b, a));
+}
+
+async function cargar(id) {
+  D = await fetch(`data/anim/${id}.json`).then(r => r.json());
+  prep();
+  const lin = D.shape || D.paradas;
+  for (const m of Object.values(maps)) m.getSource('ruta').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: lin } });
+  const bb = new maplibregl.LngLatBounds(); D.paradas.forEach(p => bb.extend(p));
+  maps.A.fitBounds(bb, { padding: { top: 70, bottom: 90, left: 30, right: 30 }, duration: 0 });
+  chart(); indicadores(); pintar(); finMostrado = false;
+}
+
+const pct = x => fmt(x * 100, 1) + '%';
+function indicadores() {
+  const a = D.estrategias.sin_control.metricas, b = D.estrategias.decisor_final.metricas;
+  const fila = (n, va, vb, f, mejorMenor = true) => {
+    const d = vb - va, bien = mejorMenor ? d < 0 : d > 0;
+    return `<div class="n">${n}</div><div>${f(va)}</div><div>${f(vb)}</div><div class="${Math.abs(d) < 1e-9 ? 'n' : bien ? 'g' : 'b'}">${d > 0 ? '+' : ''}${f === pct ? fmt(d * 100, 1) + ' p' : f(d)}</div>`;
+  };
+  const m1 = x => fmt(x, 2) + ' min', n0 = x => fmt(x);
+  $('inds').innerHTML = '<div class="h">Día completo</div><div class="h">Sin control</div><div class="h">Con pausas</div><div class="h">Diferencia</div>' +
+    fila('Espera media', a.espera_min, b.espera_min, m1) + fila('Tiempo total por viaje', a.total_min, b.total_min, m1) +
+    fila('Tiempo arriba del bus', a.a_bordo_min, b.a_bordo_min, m1) + fila('% del viaje apretado', a.pct_apretados, b.pct_apretados, pct) +
+    fila('Buses pegados (pico)', a.pct_pegados, b.pct_pegados, pct) + fila('Pasadas llenas', a.pasadas_llenas, b.pasadas_llenas, n0) +
+    fila('Gente que quedó abajo', a.quedados_abajo, b.quedados_abajo, n0);
+}
+
+function resumenFinal() {
+  const a = D.estrategias.sin_control.metricas, b = D.estrategias.decisor_final.metricas;
+  const L = IMP && IMP.lineas[`${D.linea}_${D.var}`], R = IMP && IMP.red;
+  const hDia = (a.total_min - b.total_min) * a.pasajeros / 60, hEsp = (a.espera_min - b.espera_min) * a.pasajeros / 60;
+  const apA = a.pct_apretados * a.pasajeros * a.a_bordo_min / 60, apB = b.pct_apretados * b.pasajeros * b.a_bordo_min / 60;
+  $('finbox').innerHTML = `
+    <h2>Línea ${D.linea} → ${D.destino}: así cambió el día</h2>
+    <div class="lead">${fmt(a.pasajeros)} viajes en un día hábil simulado. Mismos pasajeros y mismo tránsito, sin pausas y con pausas cortas para emparejar los ómnibus. <span class="tag">ESTIMADO</span></div>
+    <div class="big">
+      <div class="c glass"><div class="v">−${fmt((a.espera_min - b.espera_min) * 60)} s</div><div class="k">menos de espera en la parada, por viaje</div><div class="s">${fmt(a.espera_min, 1)} → ${fmt(b.espera_min, 1)} min (${fmt(100 * (b.espera_min / a.espera_min - 1))}%)</div></div>
+      <div class="c glass"><div class="v">${fmt(hDia)} h</div><div class="k">horas-persona ahorradas en el día</div><div class="s">ya descontados ${fmt((b.a_bordo_min - a.a_bordo_min) * a.pasajeros / 60)} h extra arriba del bus</div></div>
+      <div class="c glass"><div class="v">${fmt(100 * (b.pct_apretados / Math.max(a.pct_apretados, 1e-9) - 1))}%</div><div class="k">tiempo viajando apretado (más de 60 a bordo)</div><div class="s">${fmt(apA)} → ${fmt(apB)} horas-persona</div></div>
+      <div class="c glass"><div class="v">${fmt(100 * (a.pct_pegados || 0))}% → ${fmt(100 * (b.pct_pegados || 0))}%</div><div class="k">ómnibus pegados al de adelante en hora pico</div><div class="s">ocupación que vive el pasajero ${fmt(a.ocup_vivida, 1)} → ${fmt(b.ocup_vivida, 1)} personas</div></div>
+    </div>
+    <div class="cols">
+      <div class="c glass"><h3>En un mes, en esta línea (${R ? R.dias_mes : 21} días hábiles)</h3><table>
+        ${L ? `<tr><td>Horas-persona ahorradas</td><td class="g">${fmt(L.horas_mes)} h</td></tr>
+        <tr><td>Equivale a jornadas de 8 horas</td><td class="g">${fmt(L.horas_mes / 8)}</td></tr>
+        <tr><td>Para quien la usa ida y vuelta todos los días</td><td class="g">${fmt(L.min_mes_pasajero_frecuente)} min/mes</td></tr>
+        <tr><td>Horas viajando apretado que se evitan</td><td class="g">${fmt((L.horas_apretado_sin - L.horas_apretado_con) * (R ? R.dias_mes : 21))} h</td></tr>
+        <tr><td>Pausa media por viaje, incluida la terminal (el costo)</td><td>${fmt(L.retencion_s_viaje)} s</td></tr>` : '<tr><td>Sin datos del promedio</td><td></td></tr>'}
+        <tr><td colspan="2" style="color:var(--text-3);font-size:11.5px">Promedio de 10 días simulados, no solo este.</td></tr></table></div>
+      <div class="c glass"><h3>En toda la red (${R ? R.lineas : '–'} recorridos frecuentes, sin contar dos veces)</h3><table>
+        ${R ? `<tr><td>Viajes por día hábil alcanzados</td><td>${fmt(R.pasajeros_dia)}</td></tr>
+        <tr><td>Horas-persona ahorradas por día · por mes</td><td class="g">${fmt(R.horas_dia)} · ${fmt(R.horas_mes)}</td></tr>
+        <tr><td>Espera media</td><td class="g">${fmt(R.espera_sin, 1)} → ${fmt(R.espera_con, 1)} min</td></tr>
+        <tr><td>Espera de más por buses desparejos (EWT)</td><td class="g">${fmt(R.ewt_sin, 1)} → ${fmt(R.ewt_con, 1)} min (${fmt(100 * (R.ewt_con / R.ewt_sin - 1))}%)</td></tr>
+        <tr><td>% del viaje apretado</td><td class="g">${pct(R.apretados_sin)} → ${pct(R.apretados_con)}</td></tr>
+        <tr><td>Pasajero frecuente (2 viajes/día)</td><td class="g">${fmt(R.min_mes_pasajero_frecuente)} min/mes</td></tr>` : ''}
+      </table></div>
+    </div>
+    <div class="nota">Simulación calibrada con las subidas reales de agosto 2026 y los ómnibus reconstruidos; sin validar todavía con posiciones reales. No agrega ni saca ómnibus: la ocupación media del bus no cambia, cambia cómo se reparte la gente. Supuestos: la gente llega a la parada al azar (líneas frecuentes), capacidad 80, pausas de hasta 45 s en paradas y 8 min en la terminal, con tope de 4% del viaje.</div>
+    <div class="fin-btns"><button class="p" id="otra">▶ Ver de nuevo</button><button class="q" id="cerrar">Cerrar</button></div>`;
+  $('fin').style.display = 'grid';
+  $('otra').onclick = () => { $('fin').style.display = 'none'; S.T = 6.5 * 3600; finMostrado = false; if (!S.playing) toggle(); };
+  $('cerrar').onclick = () => { $('fin').style.display = 'none'; };
+}
+
+let last = null;
+function loop(ts) {
+  if (S.playing) {
+    if (last != null) { S.T += (ts - last) / 1000 * S.speed; if (S.T >= 23.9 * 3600) { S.T = 23.9 * 3600; toggle(); if (!finMostrado) { finMostrado = true; pintar(); resumenFinal(); } } }
+    last = ts; pintar();
+  } else last = null;
+  requestAnimationFrame(loop);
+}
+function toggle() { S.playing = !S.playing; $('play').innerHTML = S.playing ? PAUSE : PLAY; }
+
+async function init() {
+  IDX = await fetch('./data/anim/index.json').then(r => r.json());
+  IMP = await fetch('./data/sim/impacto.json').then(r => r.json()).catch(() => null);
+  $('linea').innerHTML = IDX.map((x, i) => `<option value="${i}">Línea ${x.linea} → ${x.destino}</option>`).join('');
+  const dias = () => { const x = IDX[+$('linea').value]; $('dia').innerHTML = x.dias.map((d, i) => `<option value="${d}">Día hábil simulado ${i + 1}</option>`).join(''); };
+  dias();
+  [maps.A, maps.B] = await Promise.all([crearMapa('A'), crearMapa('B')]);
+  sincronizar();
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('rec')) {
+    const i = IDX.findIndex(x => `${x.linea}_${x.var}` === qs.get('rec'));
+    if (i >= 0) { $('linea').value = i; dias(); }
+  }
+  if (qs.get('embed')) { document.querySelector('.topnav').style.display = 'none'; }
+  await cargar($('dia').value);
+  $('linea').onchange = () => { dias(); cargar($('dia').value); };
+  $('dia').onchange = e => cargar(e.target.value);
+  $('verres').onclick = resumenFinal;
+  $('play').innerHTML = PLAY; $('play').onclick = toggle;
+  $('go').onclick = () => { $('start').style.display = 'none'; S.T = 6.5 * 3600; if (!S.playing) toggle(); };
+  $('speed').querySelectorAll('button').forEach(b => b.onclick = () => { $('speed').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); S.speed = +b.dataset.v; });
+  addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); $('start').style.display = 'none'; toggle(); } });
+  addEventListener('resize', chart);
+  requestAnimationFrame(loop);
+}
+init();
+</script>
+<script>document.querySelectorAll('.topnav a').forEach(a => { const p = location.pathname.split('/').pop() || 'index.html'; if (a.getAttribute('href') === p) a.classList.add('on'); });</script>
+
+
+</body></html>

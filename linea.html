@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cómo se mueve</title>
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link href="css2" rel="stylesheet">
+<link href="maplibre-gl.css" rel="stylesheet">
+<script src="maplibre-gl.js"></script>
+<style>
+:root {
+  --surface: #0e0e10;
+  --glass: rgba(23, 23, 26, 0.88);
+  --line: rgba(255, 255, 255, 0.09);
+  --text-1: #ececec;
+  --text-2: #a8a8ad;
+  --text-3: #75757b;
+  --accent: #7fb2ff;
+  --est: #d9a35a;
+  --grid: rgba(255, 255, 255, 0.07);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--surface); color: var(--text-1);
+  font: 13px/1.45 "IBM Plex Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
+#map { position: absolute; inset: 0; }
+.glass { background: var(--glass); backdrop-filter: blur(16px) saturate(1.2); -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,.45); }
+
+/* Panel izquierdo */
+#panel { position: absolute; top: 16px; left: 16px; width: 340px; max-height: calc(100% - 268px); overflow-y: auto;
+  padding: 18px 18px 14px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.15) transparent; }
+#panel::-webkit-scrollbar { width: 6px; } #panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 3px; }
+.back { color: var(--text-3); text-decoration: none; font-size: 12px; display: inline-block; margin-bottom: 8px; }
+.back:hover { color: var(--text-1); }
+h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -.02em; display: flex; align-items: center; gap: 10px; }
+h1 .pill { font-size: 12px; font-weight: 600; background: var(--text-1); color: var(--surface); border-radius: 6px; padding: 2px 7px; letter-spacing: 0; }
+.sub { color: var(--text-3); font-size: 12px; margin-top: 2px; }
+.label { color: var(--text-3); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin: 16px 0 7px; }
+
+.lines { display: block; }
+.lsel { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; padding: 9px 12px; border-radius: 9px; background: rgba(255,255,255,.05); font-weight: 600; }
+.lines button { all: unset; cursor: pointer; font-weight: 700; font-size: 15px; padding: 6px 12px; border-radius: 8px;
+  background: rgba(255,255,255,.05); color: var(--text-2); font-variant-numeric: tabular-nums; transition: background .15s, color .15s; }
+.lines button:hover { color: var(--text-1); }
+.lines button.on { background: var(--text-1); color: var(--surface); }
+.lines button small { display: block; font-size: 10.5px; font-weight: 500; opacity: .7; }
+.vars { display: flex; flex-direction: column; gap: 4px; }
+.var { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; padding: 7px 10px; border-radius: 9px; cursor: pointer;
+  border: 1px solid transparent; transition: background .15s, border-color .15s; }
+.var:hover { background: rgba(255,255,255,.04); }
+.var.on { background: rgba(109,167,236,.10); border-color: rgba(109,167,236,.35); }
+.var .to { font-weight: 600; }
+.var .from { color: var(--text-3); font-size: 11.5px; grid-column: 1; }
+.var .n { color: var(--text-2); font-variant-numeric: tabular-nums; grid-row: 1 / span 2; grid-column: 2; align-self: center; text-align: right; font-size: 12px; }
+.var .n small { display: block; color: var(--text-3); font-size: 10.5px; }
+
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: rgba(255,255,255,.05); border-radius: 9px; padding: 3px; gap: 3px; }
+.seg button { all: unset; text-align: center; padding: 6px 4px; border-radius: 7px; cursor: pointer; color: var(--text-2); font-weight: 500; transition: background .15s, color .15s; }
+.seg button:hover { color: var(--text-1); }
+.seg button.on { background: rgba(255,255,255,.12); color: var(--text-1); }
+.tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .06em; padding: 2px 6px; border-radius: 5px; border: 1px solid; }
+.tag.med { color: var(--accent); border-color: rgba(109,167,236,.45); }
+.tag.est { color: var(--est); border-color: rgba(240,138,92,.45); }
+.hint { color: var(--text-2); font-size: 12px; margin-top: 8px; }
+
+.slider { margin-top: 12px; padding: 10px 12px; border-radius: 9px; background: rgba(240,138,92,.06); border: 1px solid rgba(240,138,92,.18); }
+.slider .row { display: flex; justify-content: space-between; align-items: baseline; }
+.slider b { font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--est); margin: 8px 0 2px; }
+
+.kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.kpi { padding: 10px 11px; border-radius: 10px; background: rgba(255,255,255,.035); }
+.kpi .v { font-size: 20px; font-weight: 650; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.kpi .k { color: var(--text-3); font-size: 11px; margin-top: 1px; }
+.kpi .r { color: var(--text-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+details { margin-top: 14px; color: var(--text-2); font-size: 12px; }
+summary { cursor: pointer; color: var(--text-2); font-weight: 500; }
+details p { margin: 8px 0 0; }
+
+/* Dock inferior */
+#dock { position: absolute; left: 16px; right: 16px; bottom: 16px; height: 236px; display: grid; grid-template-columns: 1.35fr 1fr; gap: 0; padding: 0; }
+.card { padding: 14px 16px 10px; position: relative; min-width: 0; display: flex; flex-direction: column; }
+.card + .card { border-left: 1px solid var(--line); }
+.card h3 { margin: 0; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.card .meta { color: var(--text-3); font-size: 11.5px; margin-left: auto; font-weight: 400; font-variant-numeric: tabular-nums; }
+.chart { flex: 1; position: relative; margin-top: 6px; }
+.chart svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ctrl { display: flex; align-items: center; gap: 10px; }
+#play { all: unset; width: 30px; height: 30px; border-radius: 50%; background: var(--text-1); color: var(--surface); display: grid; place-items: center; cursor: pointer; flex: none; }
+#play:hover { transform: scale(1.06); }
+#clock { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; min-width: 128px; }
+#allday { all: unset; cursor: pointer; font-size: 12px; color: var(--text-2); padding: 4px 9px; border-radius: 7px; border: 1px solid var(--line); }
+#allday.on { display: none; }
+.axis text { fill: var(--text-3); font-size: 10.5px; font-family: "IBM Plex Sans", sans-serif; }
+.grid line { stroke: var(--grid); }
+
+/* Leyenda */
+#legend { position: absolute; right: 16px; bottom: 284px; padding: 10px 12px; width: 220px; }
+#legend .t { font-size: 11.5px; color: var(--text-2); margin-bottom: 7px; display: flex; justify-content: space-between; gap: 8px; }
+#legend .bar { height: 8px; border-radius: 4px; }
+#legend .ends { display: flex; justify-content: space-between; color: var(--text-3); font-size: 11px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+/* Tooltip */
+#tip { position: absolute; pointer-events: none; z-index: 10; padding: 10px 12px; min-width: 200px; max-width: 280px; opacity: 0; transition: opacity .12s; font-size: 12px; }
+#tip .n { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+#tip .r { display: flex; justify-content: space-between; gap: 14px; color: var(--text-2); }
+#tip .r b { color: var(--text-1); font-weight: 600; font-variant-numeric: tabular-nums; }
+#tip .s { color: var(--text-3); font-size: 11px; margin-top: 5px; }
+
+.term { font: 600 11px 'IBM Plex Sans', sans-serif; color: var(--text-1); background: rgba(14,14,16,.88); border: 1px solid var(--line); padding: 3px 8px; border-radius: 6px; white-space: nowrap; transform: translateY(-16px); }
+.maplibregl-ctrl-attrib { background: rgba(14,14,16,.6) !important; color: var(--text-3); font-size: 10px; }
+.maplibregl-ctrl-attrib a { color: var(--text-3) !important; }
+.maplibregl-ctrl-bottom-right { bottom: 254px; }
+
+@media (max-width: 860px) {
+  #panel { width: auto; right: 16px; max-height: 42%; }
+  #dock { grid-template-columns: 1fr; height: 200px; }
+  #dock .card + .card { display: none; }
+  #legend { display: none; }
+}
+.topnav { display: flex; gap: 4px; flex-wrap: wrap; font-size: 12.5px; margin-bottom: 12px; }
+.topnav a { color: var(--text-2); text-decoration: none; padding: 4px 10px; border-radius: 999px; }
+.topnav a:hover { background: rgba(255,255,255,.05); color: var(--text-1); }
+.topnav a.on { background: var(--text-1); color: var(--surface); font-weight: 600; }
+.credito { color: var(--text-3); font-size: 11.5px; margin-top: 10px; }
+.credito a { color: var(--text-2); text-decoration: none; border-bottom: 1px solid var(--line); }
+.credito a:hover { color: var(--text-1); }
+</style>
+</head>
+<body>
+<div id="map" class="maplibregl-map"><div class="maplibregl-canvas-container maplibregl-interactive maplibregl-touch-drag-pan maplibregl-touch-zoom-rotate"><canvas class="maplibregl-canvas" tabindex="0" aria-label="Map" role="region" width="3840" height="1822" style="width: 1536px; height: 729px;"></canvas><div class="term maplibregl-marker maplibregl-marker-anchor-bottom" aria-label="Map marker" style="transform: translate(-50%, -100%) translate(1248px, 113px) rotateX(0deg) rotateZ(0deg); opacity: 1;">Avda A La Playa</div><div class="term maplibregl-marker maplibregl-marker-anchor-bottom" aria-label="Map marker" style="transform: translate(-50%, -100%) translate(439px, 342px) rotateX(0deg) rotateZ(0deg); opacity: 1;">Plaza Independencia</div></div><div class="maplibregl-control-container"><div class="maplibregl-ctrl-top-left "></div><div class="maplibregl-ctrl-top-right "></div><div class="maplibregl-ctrl-bottom-left "></div><div class="maplibregl-ctrl-bottom-right "><details class="maplibregl-ctrl maplibregl-ctrl-attrib maplibregl-compact maplibregl-compact-show" open=""><summary class="maplibregl-ctrl-attrib-button" title="Toggle attribution" aria-label="Toggle attribution"></summary><div class="maplibregl-ctrl-attrib-inner">© <a href="https://carto.com/about-carto/" target="_blank" rel="noopener">CARTO</a>, © <a href="http://www.openstreetmap.org/about/" target="_blank">OpenStreetMap</a> contributors</div></details></div></div></div>
+
+<aside id="panel" class="glass">
+  <nav class="topnav"><a href="index.html">Inicio</a><a href="mapa.html">Mapa de la ciudad</a><a href="animacion.html">Simulación animada</a><a href="simulador.html">Simulador detallado</a><a href="linea.html" class="on">Promedio por parada</a></nav>
+  <h1>Promedio por parada</h1>
+  <div class="sub">Agosto 2026 · datos abiertos de la Intendencia</div>
+
+  <div class="label">Línea</div>
+  <div class="lines" id="lineas"><select id="lsel" class="lsel"><option value="2">Línea 2 · 335 mil pasajeros/mes</option><option value="17">Línea 17 · 190 mil pasajeros/mes</option><option value="21">Línea 21 · 345 mil pasajeros/mes</option><option value="60">Línea 60 · 345 mil pasajeros/mes</option><option value="62">Línea 62 · 38 mil pasajeros/mes</option><option value="64">Línea 64 · 24 mil pasajeros/mes</option><option value="71">Línea 71 · 32 mil pasajeros/mes</option><option value="76">Línea 76 · 244 mil pasajeros/mes</option><option value="79">Línea 79 · 23 mil pasajeros/mes</option><option value="100">Línea 100 · 373 mil pasajeros/mes</option><option value="102">Línea 102 · 404 mil pasajeros/mes</option><option value="103">Línea 103 · 855 mil pasajeros/mes</option><option value="104">Línea 104 · 144 mil pasajeros/mes</option><option value="105">Línea 105 · 365 mil pasajeros/mes</option><option value="109">Línea 109 · 351 mil pasajeros/mes</option><option value="110">Línea 110 · 495 mil pasajeros/mes</option><option value="111">Línea 111 · 153 mil pasajeros/mes</option><option value="112">Línea 112 · 58 mil pasajeros/mes</option><option value="113">Línea 113 · 84 mil pasajeros/mes</option><option value="115">Línea 115 · 137 mil pasajeros/mes</option><option value="116">Línea 116 · 225 mil pasajeros/mes</option><option value="117">Línea 117 · 77 mil pasajeros/mes</option><option value="121">Línea 121 · 289 mil pasajeros/mes</option><option value="124">Línea 124 · 370 mil pasajeros/mes</option><option value="125">Línea 125 · 195 mil pasajeros/mes</option><option value="127">Línea 127 · 316 mil pasajeros/mes</option><option value="128">Línea 128 · 349 mil pasajeros/mes</option><option value="130">Línea 130 · 360 mil pasajeros/mes</option><option value="133">Línea 133 · 19 mil pasajeros/mes</option><option value="137">Línea 137 · 459 mil pasajeros/mes</option><option value="141">Línea 141 · 10 mil pasajeros/mes</option><option value="142">Línea 142 · 179 mil pasajeros/mes</option><option value="143">Línea 143 · 35 mil pasajeros/mes</option><option value="144">Línea 144 · 286 mil pasajeros/mes</option><option value="145">Línea 145 · 567 mil pasajeros/mes</option><option value="147">Línea 147 · 90 mil pasajeros/mes</option><option value="148">Línea 148 · 254 mil pasajeros/mes</option><option value="149">Línea 149 · 411 mil pasajeros/mes</option><option value="150">Línea 150 · 37 mil pasajeros/mes</option><option value="151">Línea 151 · 433 mil pasajeros/mes</option><option value="155">Línea 155 · 80 mil pasajeros/mes</option><option value="156">Línea 156 · 153 mil pasajeros/mes</option><option value="157">Línea 157 · 48 mil pasajeros/mes</option><option value="158">Línea 158 · 359 mil pasajeros/mes</option><option value="163">Línea 163 · 502 mil pasajeros/mes</option><option value="169">Línea 169 · 405 mil pasajeros/mes</option><option value="174">Línea 174 · 504 mil pasajeros/mes</option><option value="175">Línea 175 · 412 mil pasajeros/mes</option><option value="180">Línea 180 · 298 mil pasajeros/mes</option><option value="181">Línea 181 · 576 mil pasajeros/mes</option><option value="182">Línea 182 · 7 mil pasajeros/mes</option><option value="183">Línea 183 · 571 mil pasajeros/mes</option><option value="185">Línea 185 · 576 mil pasajeros/mes</option><option value="186">Línea 186 · 129 mil pasajeros/mes</option><option value="187">Línea 187 · 55 mil pasajeros/mes</option><option value="188">Línea 188 · 144 mil pasajeros/mes</option><option value="191">Línea 191 · 92 mil pasajeros/mes</option><option value="192">Línea 192 · 337 mil pasajeros/mes</option><option value="195">Línea 195 · 388 mil pasajeros/mes</option><option value="199">Línea 199 · 300 mil pasajeros/mes</option><option value="300">Línea 300 · 479 mil pasajeros/mes</option><option value="306">Línea 306 · 525 mil pasajeros/mes</option><option value="316">Línea 316 · 290 mil pasajeros/mes</option><option value="328">Línea 328 · 148 mil pasajeros/mes</option><option value="329">Línea 329 · 196 mil pasajeros/mes</option><option value="330">Línea 330 · 111 mil pasajeros/mes</option><option value="370">Línea 370 · 435 mil pasajeros/mes</option><option value="396">Línea 396 · 24 mil pasajeros/mes</option><option value="402">Línea 402 · 169 mil pasajeros/mes</option><option value="404">Línea 404 · 192 mil pasajeros/mes</option><option value="405">Línea 405 · 521 mil pasajeros/mes</option><option value="407">Línea 407 · 160 mil pasajeros/mes</option><option value="409">Línea 409 · 237 mil pasajeros/mes</option><option value="427">Línea 427 · 398 mil pasajeros/mes</option><option value="456">Línea 456 · 162 mil pasajeros/mes</option><option value="468">Línea 468 · 608 mil pasajeros/mes</option><option value="494">Línea 494 · 403 mil pasajeros/mes</option><option value="495">Línea 495 · 5 mil pasajeros/mes</option><option value="505">Línea 505 · 383 mil pasajeros/mes</option><option value="522">Línea 522 · 279 mil pasajeros/mes</option><option value="524">Línea 524 · 121 mil pasajeros/mes</option><option value="526">Línea 526 · 456 mil pasajeros/mes</option><option value="538">Línea 538 · 141 mil pasajeros/mes</option><option value="546">Línea 546 · 441 mil pasajeros/mes</option><option value="582">Línea 582 · 342 mil pasajeros/mes</option><option value="BT1">Línea BT1 · 3 mil pasajeros/mes</option><option value="CE1">Línea CE1 · 275 mil pasajeros/mes</option><option value="D1">Línea D1 · 26 mil pasajeros/mes</option><option value="D5">Línea D5 · 7 mil pasajeros/mes</option><option value="D8">Línea D8 · 81 mil pasajeros/mes</option><option value="D9">Línea D9 · 8 mil pasajeros/mes</option><option value="D10">Línea D10 · 18 mil pasajeros/mes</option><option value="D11">Línea D11 · 57 mil pasajeros/mes</option><option value="E14">Línea E14 · 45 mil pasajeros/mes</option><option value="G3">Línea G3 · 10 mil pasajeros/mes</option><option value="G8">Línea G8 · 7 mil pasajeros/mes</option><option value="G10">Línea G10 · 15 mil pasajeros/mes</option><option value="G11">Línea G11 · 19 mil pasajeros/mes</option><option value="L1">Línea L1 · 22 mil pasajeros/mes</option><option value="L2">Línea L2 · 32 mil pasajeros/mes</option><option value="L3">Línea L3 · 26 mil pasajeros/mes</option><option value="L4">Línea L4 · 76 mil pasajeros/mes</option><option value="L5">Línea L5 · 11 mil pasajeros/mes</option><option value="L6">Línea L6 · 55 mil pasajeros/mes</option><option value="L7">Línea L7 · 39 mil pasajeros/mes</option><option value="L8">Línea L8 · 12 mil pasajeros/mes</option><option value="L9">Línea L9 · 66 mil pasajeros/mes</option><option value="L12">Línea L12 · 11 mil pasajeros/mes</option><option value="L13">Línea L13 · 42 mil pasajeros/mes</option><option value="L14">Línea L14 · 128 mil pasajeros/mes</option><option value="L15">Línea L15 · 81 mil pasajeros/mes</option><option value="L16">Línea L16 · 29 mil pasajeros/mes</option><option value="L19">Línea L19 · 4 mil pasajeros/mes</option><option value="L20">Línea L20 · 23 mil pasajeros/mes</option><option value="L22">Línea L22 · 14 mil pasajeros/mes</option><option value="L23">Línea L23 · 3 mil pasajeros/mes</option><option value="L24">Línea L24 · 21 mil pasajeros/mes</option><option value="L25">Línea L25 · 16 mil pasajeros/mes</option><option value="L26">Línea L26 · 7 mil pasajeros/mes</option><option value="L28">Línea L28 · 47 mil pasajeros/mes</option><option value="L29">Línea L29 · 73 mil pasajeros/mes</option><option value="L30">Línea L30 · 7 mil pasajeros/mes</option><option value="L31">Línea L31 · 7 mil pasajeros/mes</option><option value="L32">Línea L32 · 6 mil pasajeros/mes</option><option value="L33">Línea L33 · 4 mil pasajeros/mes</option><option value="L35">Línea L35 · 20 mil pasajeros/mes</option><option value="L36">Línea L36 · 44 mil pasajeros/mes</option><option value="L38">Línea L38 · 18 mil pasajeros/mes</option><option value="L39">Línea L39 · 10 mil pasajeros/mes</option><option value="L41">Línea L41 · 24 mil pasajeros/mes</option><option value="L46">Línea L46 · 50 mil pasajeros/mes</option><option value="L77">Línea L77 · 15 mil pasajeros/mes</option></select></div>
+
+  <div class="label">Recorrido y sentido</div>
+  <div class="vars" id="vars"><div class="var on" data-i="0">
+      <div class="to">→ Plaza Independencia</div>
+      <div class="from">desde Avda A La Playa</div>
+      <div class="n">2.005<small>subidas/día</small></div></div><div class="var " data-i="1">
+      <div class="to">→ Géant</div>
+      <div class="from">desde Juncal</div>
+      <div class="n">1.706<small>subidas/día</small></div></div><div class="var " data-i="2">
+      <div class="to">→ Plaza Independencia</div>
+      <div class="from">desde Rbla Costanera</div>
+      <div class="n">1.346<small>subidas/día</small></div></div><div class="var " data-i="3">
+      <div class="to">→ Rambla Costanera</div>
+      <div class="from">desde Juncal</div>
+      <div class="n">1.094<small>subidas/día</small></div></div></div>
+
+  <div class="label">Día</div>
+  <div class="seg" id="tipo">
+    <button data-v="habil" class="on">Hábil</button><button data-v="sabado">Sábado</button><button data-v="domingo">Domingo</button>
+  </div>
+
+  <div class="label">Qué ver</div>
+  <div class="seg" id="metric">
+    <button data-v="subidas" class="on">Subidas</button><button data-v="bajadas">Bajadas</button><button data-v="abordo">A bordo</button>
+  </div>
+  <div class="hint" id="mhint"><span class="tag med">MEDIDO</span> &nbsp;Gente que sube en cada parada.</div>
+
+  <div class="slider" id="lslider" hidden="">
+    <div class="row"><span>Largo medio de viaje</span><b id="lval">6,6 km por el recorrido</b></div>
+    <input type="range" id="L" min="4" max="20" step="1" value="12">
+    <div class="sub">Calibrado con la Encuesta Origen-Destino 2016. Movelo para ver cuánto cambia el resultado.</div>
+  </div>
+
+  <div class="label" id="kpilabel">Resumen del día</div>
+  <div class="kpis" id="kpis">
+    <div class="kpi"><div class="v">2.005</div><div class="k">Subidas <span class="tag med">MEDIDO</span></div></div>
+    <div class="kpi"><div class="v">35</div><div class="k">Salidas programadas</div></div>
+    <div class="kpi"><div class="v">57,3</div><div class="k">Pasajeros por salida</div></div>
+    <div class="kpi"><div class="v">33</div><div class="k">Máx. a bordo/bus <span class="tag est">EST.</span></div>
+      <div class="r">rango 31–34</div></div></div>
+
+  <details>
+    <summary>¿Cómo se calcula?</summary>
+    <p><span class="tag med">MEDIDO</span> Subidas: cada vez que alguien pasa la tarjeta o paga el boleto. Promedio por día del tipo elegido. Se excluye el feriado del 25/8.</p>
+    <p><span class="tag est">ESTIMADO</span> Bajadas de quien hace trasbordo (<span id="ptr">17% de las subidas en este sentido</span>): se baja en la parada del recorrido más cercana a donde sube al siguiente bus con el mismo boleto (máx. 1 km).</p>
+    <p><span class="tag est">ESTIMADO</span> Resto de las bajadas: supuesto de simetría. Si a la tarde mucha gente sube cerca de una parada, a la mañana mucha gente baja ahí (y al revés), ponderado por el largo de viaje.</p>
+    <p><span class="tag est">ESTIMADO</span> A bordo por bus: subidas menos bajadas acumuladas, dividido por las salidas <i>programadas</i> (GTFS), no las reales.</p>
+  </details>
+  <div class="credito">Hecho por Tomás Sanz · <a href="https://www.linkedin.com/in/tomassanz/" target="_blank" rel="noopener">LinkedIn</a> · <a href="https://x.com/tomi_sanz" target="_blank" rel="noopener">X / Twitter</a></div>
+</aside>
+
+<div id="legend" class="glass">
+  <div class="t"><span id="lgt">Subidas por día</span><span id="lgtag"><span class="tag med">MEDIDO</span></span></div>
+  <div class="bar" id="lgbar" style="background: linear-gradient(90deg, rgb(30, 58, 138), rgb(29, 78, 216), rgb(14, 165, 233), rgb(56, 189, 248), rgb(125, 211, 252), rgb(224, 242, 254));"></div>
+  <div class="ends"><span>0</span><span id="lgmax">115</span></div>
+</div>
+
+<section id="dock" class="glass">
+  <div class="card">
+    <div class="ctrl">
+      <button id="play" title="Reproducir (barra espaciadora)" aria-label="Reproducir"><svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.5v9l7.5-4.5z" fill="currentColor"></path></svg></button>
+      <div id="clock">Todo el día</div>
+      <button id="allday" class="on">Ver día completo</button>
+      <span class="meta" id="tmeta">subidas por día, cada 30 min</span>
+    </div>
+    <div class="chart" id="tl"><svg viewBox="0 0 831 173"><g class="grid"><line x1="34" x2="831" y1="155" y2="155"></line><line x1="34" x2="831" y1="82.28160078086869" y2="82.28160078086869"></line><line x1="34" x2="831" y1="9.56320156173738" y2="9.56320156173738"></line></g><g class="axis"><text x="28" y="158.5" text-anchor="end">0</text><text x="28" y="85.78160078086869" text-anchor="end">50</text><text x="28" y="13.06320156173738" text-anchor="end">100</text><text x="34" y="170" text-anchor="start">0h</text><text x="133.625" y="170" text-anchor="middle">3h</text><text x="233.25" y="170" text-anchor="middle">6h</text><text x="332.875" y="170" text-anchor="middle">9h</text><text x="432.5" y="170" text-anchor="middle">12h</text><text x="532.125" y="170" text-anchor="middle">15h</text><text x="631.75" y="170" text-anchor="middle">18h</text><text x="731.375" y="170" text-anchor="middle">21h</text><text x="831" y="170" text-anchor="end">24h</text></g><rect x="35" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="51.60416666666667" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="68.20833333333334" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="84.8125" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="101.41666666666667" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="118.02083333333334" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="134.625" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="151.22916666666669" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="167.83333333333334" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="184.4375" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="201.04166666666669" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="217.64583333333334" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="234.25" y="154" width="14.604166666666668" height="1" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="250.85416666666669" y="113.40507564665688" width="14.604166666666668" height="41.59492435334312" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="267.45833333333337" y="46.06783796974133" width="14.604166666666668" height="108.93216203025867" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="284.0625" y="53.04880429477787" width="14.604166666666668" height="101.95119570522213" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="300.6666666666667" y="36.1781356759394" width="14.604166666666668" height="118.8218643240606" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="317.27083333333337" y="18.653001464128778" width="14.604166666666668" height="136.34699853587122" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="333.875" y="39.0141532454856" width="14.604166666666668" height="115.9858467545144" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="350.4791666666667" y="47.01317715959004" width="14.604166666666668" height="107.98682284040996" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="367.08333333333337" y="45.99511957052218" width="14.604166666666668" height="109.00488042947782" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="383.6875" y="79.95461200585646" width="14.604166666666668" height="75.04538799414354" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="400.2916666666667" y="77.40946803318688" width="14.604166666666668" height="77.59053196681312" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="416.89583333333337" y="67.88335773548067" width="14.604166666666668" height="87.11664226451933" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="433.5" y="33.196681307955004" width="14.604166666666668" height="121.803318692045" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="450.1041666666667" y="59.01171303074668" width="14.604166666666668" height="95.98828696925332" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="466.70833333333337" y="27.5246461688628" width="14.604166666666668" height="127.4753538311372" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="483.31250000000006" y="10.872132747681775" width="14.604166666666668" height="144.12786725231823" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="499.9166666666667" y="6" width="14.604166666666668" height="149" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="516.5208333333334" y="42.28648121034652" width="14.604166666666668" height="112.71351878965348" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="533.125" y="37.48706686188385" width="14.604166666666668" height="117.51293313811615" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="549.7291666666667" y="57.41190824792574" width="14.604166666666668" height="97.58809175207426" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="566.3333333333334" y="22.434358223523617" width="14.604166666666668" height="132.56564177647638" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="582.9375" y="47.01317715959004" width="14.604166666666668" height="107.98682284040996" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="599.5416666666667" y="25.19765739385059" width="14.604166666666668" height="129.8023426061494" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="616.1458333333334" y="55.6666666666666" width="14.604166666666668" height="99.3333333333334" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="632.75" y="76.46412884333817" width="14.604166666666668" height="78.53587115666183" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="649.3541666666667" y="84.09956076134696" width="14.604166666666668" height="70.90043923865304" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="665.9583333333334" y="92.68033186920447" width="14.604166666666668" height="62.319668130795534" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="682.5625" y="100.75207418252803" width="14.604166666666668" height="54.247925817471966" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="699.1666666666667" y="89.40800390434357" width="14.604166666666668" height="65.59199609565643" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="715.7708333333334" y="135.65690580771107" width="14.604166666666668" height="19.34309419228893" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="732.375" y="133.98438262567106" width="14.604166666666668" height="21.01561737432894" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="748.9791666666667" y="127.8033186920449" width="14.604166666666668" height="27.196681307955103" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="765.5833333333334" y="154" width="14.604166666666668" height="1" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="782.1875" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="798.7916666666667" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="815.3958333333334" y="155" width="14.604166666666668" height="0" rx="2" fill="#38bdf8" opacity="1"></rect><rect x="34" y="0" width="797" height="173" fill="transparent" style="cursor:pointer"></rect></svg></div>
+  </div>
+  <div class="card">
+    <h3>A bordo por bus a lo largo del recorrido <span class="tag est">ESTIMADO</span><span class="meta" id="pmeta">promedio del día</span></h3>
+    <div class="chart" id="pf"><svg viewBox="0 0 607 184"><g class="grid"><line x1="30" x2="601" y1="166" y2="166"></line><line x1="30" x2="601" y1="144.6391040832432" y2="144.6391040832432"></line><line x1="30" x2="601" y1="123.27820816648641" y2="123.27820816648641"></line><line x1="30" x2="601" y1="101.91731224972959" y2="101.91731224972959"></line><line x1="30" x2="601" y1="80.55641633297279" y2="80.55641633297279"></line><line x1="30" x2="601" y1="59.19552041621597" y2="59.19552041621597"></line><line x1="30" x2="601" y1="37.834624499459174" y2="37.834624499459174"></line><line x1="30" x2="601" y1="16.473728582702357" y2="16.473728582702357"></line></g><g class="axis"><text x="24" y="169.5" text-anchor="end">0</text><text x="24" y="148.1391040832432" text-anchor="end">5</text><text x="24" y="126.77820816648641" text-anchor="end">10</text><text x="24" y="105.41731224972959" text-anchor="end">15</text><text x="24" y="84.05641633297279" text-anchor="end">20</text><text x="24" y="62.69552041621597" text-anchor="end">25</text><text x="24" y="41.334624499459174" text-anchor="end">30</text><text x="24" y="19.973728582702357" text-anchor="end">35</text><text x="30" y="181" text-anchor="middle">0 km</text><text x="141.45269116283612" y="181" text-anchor="middle">4 km</text><text x="252.9053823256722" y="181" text-anchor="middle">8 km</text><text x="364.3580734885083" y="181" text-anchor="middle">12 km</text><text x="475.8107646513444" y="181" text-anchor="middle">16 km</text><text x="587.2634558141805" y="181" text-anchor="middle">20 km</text></g><path d="M30,152.9149254727067L43.931586395354515,152.9149254727067L43.931586395354515,151.52052878697032L51.482506221636655,151.52052878697032L51.482506221636655,150.04402868755665L56.47001415117357,150.04402868755665L56.47001415117357,147.9567177837642L73.57800224466891,147.9567177837642L73.57800224466891,146.94640998877213L79.81935294978774,146.94640998877213L79.81935294978774,146.78483885006744L95.06050846630558,146.78483885006744L95.06050846630558,146.50619356812618L108.0726101595667,146.50619356812618L108.0726101595667,144.24527750304645L118.60488947445471,144.24527750304645L118.60488947445471,142.92671267580457L125.96076709120187,142.92671267580457L125.96076709120187,141.06467285871776L135.82433025911286,141.06467285871776L135.82433025911286,139.04248055120487L149.58873761772313,139.04248055120487L149.58873761772313,137.26981714990757L160.037427414239,137.26981714990757L160.037427414239,133.58869539624692L167.86697896842827,133.58869539624692L167.86697896842827,119.87404173907797L174.97208803005907,119.87404173907797L174.97208803005907,115.48096648848035L182.35582881959695,115.48096648848035L182.35582881959695,106.69391788077829L186.98111550285466,106.69391788077829L186.98111550285466,106.76435561480781L194.97784609378814,106.76435561480781L194.97784609378814,106.79732814170565L202.19440784658175,106.79732814170565L202.19440784658175,106.84155400771348L207.87849509588642,106.84155400771348L207.87849509588642,106.95855270852417L214.06411945542382,106.95855270852417L214.06411945542382,101.2409898286404L226.12887327380082,101.2409898286404L226.12887327380082,97.49964563281227L233.6240667545015,97.49964563281227L233.6240667545015,92.81985904080155L241.95515541892354,92.81985904080155L241.95515541892354,91.18050596330319L246.91480017566974,91.18050596330319L246.91480017566974,91.1296595386188L251.03854974869466,91.1296595386188L251.03854974869466,88.02394297696932L258.1993851559069,88.02394297696932L258.1993851559069,85.0078416004668L266.4468843019568,85.0078416004668L266.4468843019568,82.77557678319282L271.96379251451714,82.77557678319282L271.96379251451714,80.23063673489376L280.5735129068463,80.23063673489376L280.5735129068463,77.57965283408215L285.5888840091739,77.57965283408215L285.5888840091739,76.14179186790129L289.54545454545456,76.14179186790129L289.54545454545456,73.82297200916457L295.92612111452695,73.82297200916457L295.92612111452695,71.06276192820357L301.6380715366223,71.06276192820357L301.6380715366223,68.1636940139035L310.72146586639343,68.1636940139035L310.72146586639343,64.37328615818336L316.60059532523303,64.37328615818336L316.60059532523303,62.29434473544168L321.1422924901186,62.29434473544168L321.1422924901186,58.36098101502305L329.08329673547064,58.36098101502305L329.08329673547064,54.272507804690974L336.43917435221783,54.272507804690974L336.43917435221783,51.48512857920772L342.4018933294296,51.48512857920772L342.4018933294296,49.89617620762586L362.9091885033914,49.89617620762586L362.9091885033914,49.89811183398211L370.20933977455724,49.89811183398211L370.20933977455724,49.529603248027456L380.32367149758454,49.529603248027456L380.32367149758454,44.86168708705957L388.4597179524716,44.86168708705957L388.4597179524716,42.463112837765784L398.3511442931733,42.463112837765784L398.3511442931733,43.42767125033476L405.70702190992046,43.42767125033476L405.70702190992046,45.016630542843885L417.6881862099254,45.016630542843885L417.6881862099254,42.18898626403148L424.6818425803933,42.18898626403148L424.6818425803933,40.681648338774906L431.11823549504714,40.681648338774906L431.11823549504714,42.2737730340166L436.1893329429562,42.2737730340166L436.1893329429562,44.10283294888805L445.1334114087737,44.10283294888805L445.1334114087737,44.371432522514695L451.3747621138926,44.371432522514695L451.3747621138926,43.06978670329654L461.5169570097106,43.06978670329654L461.5169570097106,36.450225056508565L468.92856097203924,36.450225056508565L468.92856097203924,31.900824918260128L478.0955448201825,31.900824918260128L478.0955448201825,28.42046520220487L491.83208900600204,28.42046520220487L491.83208900600204,27.681009147776457L500.8040306446104,27.681009147776457L500.8040306446104,23.950860726804336L508.6614453715903,23.950860726804336L508.6614453715903,22.917947245427605L517.494071146245,22.917947245427605L517.494071146245,19.70370370370372L524.2648221343875,19.70370370370372L524.2648221343875,25.835534736136488L529.6981408285757,25.835534736136488L529.6981408285757,38.8280433621719L540.7040940809057,38.8280433621719L540.7040940809057,55.3168080896557L552.0444054067243,55.3168080896557L552.0444054067243,72.51368236126855L567.0347923681257,72.51368236126855L567.0347923681257,93.13619544319536L577.1212609183624,93.13619544319536L577.1212609183624,118.55463323861284L589.520372810228,118.55463323861284L589.520372810228,144.98854057800924L601,144.98854057800924L601,147.78897963000728L589.520372810228,147.78897963000728L589.520372810228,124.1506337626701L577.1212609183624,124.1506337626701L577.1212609183624,101.31860022402732L567.0347923681257,101.31860022402732L567.0347923681257,82.60924590691562L552.0444054067243,82.60924590691562L552.0444054067243,66.52923241080171L540.7040940809057,66.52923241080171L540.7040940809057,50.80990934998205L529.6981408285757,50.80990934998205L529.6981408285757,38.09625245528156L524.2648221343875,38.09625245528156L524.2648221343875,32.06489259629198L517.494071146245,32.06489259629198L517.494071146245,35.28062523181275L508.6614453715903,35.28062523181275L508.6614453715903,36.24666965679303L500.8040306446104,36.24666965679303L500.8040306446104,39.857336589177045L491.83208900600204,39.857336589177045L491.83208900600204,40.3178165714366L478.0955448201825,40.3178165714366L478.0955448201825,43.53891469415106L468.92856097203924,43.53891469415106L468.92856097203924,47.82677428556159L461.5169570097106,47.82677428556159L461.5169570097106,54.08087821958809L451.3747621138926,54.08087821958809L451.3747621138926,54.95411739877546L445.1334114087737,54.95411739877546L445.1334114087737,54.27859659237898L436.1893329429562,54.27859659237898L436.1893329429562,51.89930692924198L431.11823549504714,51.89930692924198L431.11823549504714,49.62467389371693L424.6818425803933,49.62467389371693L424.6818425803933,50.540592413360805L417.6881862099254,50.540592413360805L417.6881862099254,52.89163704245318L405.70702190992046,52.89163704245318L405.70702190992046,50.60701911895109L398.3511442931733,50.60701911895109L398.3511442931733,48.85977274351795L388.4597179524716,48.85977274351795L388.4597179524716,51.16058213549721L380.32367149758454,51.16058213549721L380.32367149758454,55.766805190709434L370.20933977455724,55.766805190709434L370.20933977455724,56.11523679448218L362.9091885033914,56.11523679448218L362.9091885033914,56.1050568814769L342.4018933294296,56.1050568814769L342.4018933294296,57.224542741016634L336.43917435221783,57.224542741016634L336.43917435221783,59.83080624099884L329.08329673547064,59.83080624099884L329.08329673547064,63.84826462607129L321.1422924901186,63.84826462607129L321.1422924901186,67.5059127910672L316.60059532523303,67.5059127910672L316.60059532523303,69.32593526718131L310.72146586639343,69.32593526718131L310.72146586639343,72.600135643246L301.6380715366223,72.600135643246L301.6380715366223,75.05981500732085L295.92612111452695,75.05981500732085L295.92612111452695,77.48065616535578L289.54545454545456,77.48065616535578L289.54545454545456,79.52393666914989L285.5888840091739,79.52393666914989L285.5888840091739,80.6950293498831L280.5735129068463,80.6950293498831L280.5735129068463,83.053140482587L271.96379251451714,83.053140482587L271.96379251451714,85.33445659253582L266.4468843019568,85.33445659253582L266.4468843019568,87.33565018236744L258.1993851559069,87.33565018236744L258.1993851559069,90.1706507652246L251.03854974869466,90.1706507652246L251.03854974869466,93.10206584278394L246.91480017566974,93.10206584278394L246.91480017566974,93.03969011077407L241.95515541892354,93.03969011077407L241.95515541892354,94.45818396422955L233.6240667545015,94.45818396422955L233.6240667545015,98.94815365249052L226.12887327380082,98.94815365249052L226.12887327380082,102.52845426256748L214.06411945542382,102.52845426256748L214.06411945542382,108.14738139756012L207.87849509588642,108.14738139756012L207.87849509588642,107.90990160210336L202.19440784658175,107.90990160210336L202.19440784658175,107.82557523006345L194.97784609378814,107.82557523006345L194.97784609378814,107.75669488579605L186.98111550285466,107.75669488579605L186.98111550285466,107.61385174963279L182.35582881959695,107.61385174963279L182.35582881959695,116.32213625065936L174.97208803005907,116.32213625065936L174.97208803005907,120.56188990007867L167.86697896842827,120.56188990007867L167.86697896842827,134.04660632842928L160.037427414239,134.04660632842928L160.037427414239,137.57413352158136L149.58873761772313,137.57413352158136L149.58873761772313,139.3016529226178L135.82433025911286,139.3016529226178L135.82433025911286,141.26597710480064L125.96076709120187,141.26597710480064L125.96076709120187,143.06528060430216L118.60488947445471,143.06528060430216L118.60488947445471,144.32788932342888L108.0726101595667,144.32788932342888L108.0726101595667,146.5538116507943L95.06050846630558,146.5538116507943L95.06050846630558,146.8288593990123L79.81935294978774,146.8288593990123L79.81935294978774,146.98450355088212L73.57800224466891,146.98450355088212L73.57800224466891,147.98948872572169L56.47001415117357,147.98948872572169L56.47001415117357,150.06449870068354L51.482506221636655,150.06449870068354L51.482506221636655,151.52741283210742L43.931586395354515,151.52741283210742L43.931586395354515,152.9149254727067L30,152.9149254727067Z" fill="#38bdf8" opacity="0.16"></path><path d="M30,152.9149254727067L43.931586395354515,152.9149254727067L43.931586395354515,151.52297716189932L51.482506221636655,151.52297716189932L51.482506221636655,150.05134827574415L56.47001415117357,150.05134827574415L56.47001415117357,147.96846790700098L73.57800224466891,147.96846790700098L73.57800224466891,146.960106447358L79.81935294978774,146.960106447358L79.81935294978774,146.80071593437245L95.06050846630558,146.80071593437245L95.06050846630558,146.52341904565742L108.0726101595667,146.52341904565742L108.0726101595667,144.2757913761241L118.60488947445471,144.2757913761241L118.60488947445471,142.9786995714062L125.96076709120187,142.9786995714062L125.96076709120187,141.14090917330336L135.82433025911286,141.14090917330336L135.82433025911286,139.14129323981064L149.58873761772313,139.14129323981064L149.58873761772313,137.38647914271817L160.037427414239,137.38647914271817L160.037427414239,133.7666868264013L167.86697896842827,133.7666868264013L167.86697896842827,120.14450006822602L174.97208803005907,120.14450006822602L174.97208803005907,115.81338064561643L182.35582881959695,115.81338064561643L182.35582881959695,107.05831992229092L186.98111550285466,107.05831992229092L186.98111550285466,107.15826370323477L194.97784609378814,107.15826370323477L194.97784609378814,107.2059363404939L202.19440784658175,107.2059363404939L202.19440784658175,107.26667478859169L207.87849509588642,107.26667478859169L207.87849509588642,107.43338597457597L214.06411945542382,107.43338597457597L214.06411945542382,101.75671367642643L226.12887327380082,101.75671367642643L226.12887327380082,98.08270414606417L233.6240667545015,98.08270414606417L233.6240667545015,93.48270545193724L241.95515541892354,93.48270545193724L241.95515541892354,91.9366503304154L246.91480017566974,91.9366503304154L246.91480017566974,91.9337281602681L251.03854974869466,91.9337281602681L251.03854974869466,88.9020448612012L258.1993851559069,88.9020448612012L258.1993851559069,85.96325597208438L266.4468843019568,85.96325597208438L266.4468843019568,83.83032902960207L271.96379251451714,83.83032902960207L271.96379251451714,81.39924446065831L280.5735129068463,81.39924446065831L280.5735129068463,78.87553454510929L285.5888840091739,78.87553454510929L285.5888840091739,77.55402679444656L289.54545454545456,77.55402679444656L289.54545454545456,75.3557590132706L295.92612111452695,75.3557590132706L295.92612111452695,72.74469359336402L301.6380715366223,72.74469359336402L301.6380715366223,70.03958125331795L310.72146586639343,70.03958125331795L310.72146586639343,66.47856299263053L316.60059532523303,66.47856299263053L316.60059532523303,64.51514570589475L321.1422924901186,64.51514570589475L321.1422924901186,60.70519054083542L329.08329673547064,60.70519054083542L329.08329673547064,56.64867100806675L336.43917435221783,56.64867100806675L336.43917435221783,53.943222607535596L342.4018933294296,53.943222607535596L342.4018933294296,52.56779540898615L362.9091885033914,52.56779540898615L362.9091885033914,52.57354609260159L370.20933977455724,52.57354609260159L370.20933977455724,52.214395616418486L380.32367149758454,52.214395616418486L380.32367149758454,47.575542624294165L388.4597179524716,47.575542624294165L388.4597179524716,45.223435272088494L398.3511442931733,45.223435272088494L398.3511442931733,46.56402536881729L405.70702190992046,46.56402536881729L405.70702190992046,48.4898885402513L417.6881862099254,48.4898885402513L417.6881862099254,45.896073535727524L424.6818425803933,45.896073535727524L424.6818425803933,44.681261806062004L431.11823549504714,44.681261806062004L431.11823549504714,46.61352081927832L436.1893329429562,46.61352081927832L436.1893329429562,48.718505258906184L445.1334114087737,48.718505258906184L445.1334114087737,49.193691556622944L451.3747621138926,49.193691556622944L451.3747621138926,48.11168934192763L461.5169570097106,48.11168934192763L461.5169570097106,41.68293076795515L468.92856097203924,41.68293076795515L468.92856097203924,37.27197553322752L478.0955448201825,37.27197553322752L478.0955448201825,33.93180102609567L491.83208900600204,33.93180102609567L491.83208900600204,33.35126537453873L500.8040306446104,33.35126537453873L500.8040306446104,29.69439359208029L508.6614453715903,29.69439359208029L508.6614453715903,28.71018598126456L517.494071146245,28.71018598126456L517.494071146245,25.507200203660794L524.2648221343875,25.507200203660794L524.2648221343875,31.6197223159124L529.6981408285757,31.6197223159124L529.6981408285757,44.51894911780834L540.7040940809057,44.51894911780834L540.7040940809057,60.68627387129242L552.0444054067243,60.68627387129242L552.0444054067243,77.38200074742764L567.0347923681257,77.38200074742764L567.0347923681257,97.10725309386312L577.1212609183624,97.10725309386312L577.1212609183624,121.29000032703784L589.520372810228,121.29000032703784L589.520372810228,146.3656780564577L601,146.3656780564577" fill="none" stroke="#7dd3fc" stroke-width="2" stroke-linejoin="round"></path><line y1="8" y2="166" stroke="rgba(255,255,255,.4)" opacity="0"></line><rect x="30" y="0" width="577" height="184" fill="transparent"></rect></svg></div>
+  </div>
+</section>
+
+<div id="tip" class="glass"></div>
+
+<script>
+const LINEA = new URLSearchParams(location.search).get('linea') || '100';
+const RAMPS = {
+  subidas: ['#1e3a8a', '#1d4ed8', '#0ea5e9', '#38bdf8', '#7dd3fc', '#e0f2fe'],
+  bajadas: ['#7c2d12', '#c2410c', '#f97316', '#fb923c', '#fdba74', '#ffedd5'],
+  abordo:  ['#1e3a8a', '#1d4ed8', '#0ea5e9', '#38bdf8', '#7dd3fc', '#e0f2fe'],
+};
+const NOMBRE = { subidas: 'Subidas por día', bajadas: 'Bajadas por día', abordo: 'Pasajeros a bordo por bus' };
+const HINT = {
+  subidas: '<span class="tag med">MEDIDO</span> &nbsp;Gente que sube en cada parada.',
+  bajadas: '<span class="tag est">ESTIMADO</span> &nbsp;Trasbordos inferidos + supuesto de simetría.',
+  abordo: '<span class="tag est">ESTIMADO</span> &nbsp;Cuánta gente va en cada bus, tramo a tramo.',
+};
+const PLAY = '<svg width="12" height="12" viewBox="0 0 12 12"><path d="M3 1.5v9l7.5-4.5z" fill="currentColor"/></svg>';
+const PAUSE = '<svg width="12" height="12" viewBox="0 0 12 12"><rect x="2.5" y="1.5" width="2.5" height="9" rx="1" fill="currentColor"/><rect x="7" y="1.5" width="2.5" height="9" rx="1" fill="currentColor"/></svg>';
+const CAPACIDAD = 80;
+
+const S = { v: 0, t: 'habil', m: 'subidas', slot: null, L: 12, playing: false, hover: null };
+let D, map, timer, cache = {};
+const $ = id => document.getElementById(id);
+const fmt = (x, d = 0) => x == null || !isFinite(x) ? '–' : x.toLocaleString('es-UY', { minimumFractionDigits: d, maximumFractionDigits: d });
+const hh = s => `${String(Math.floor(s / 2) % 24).padStart(2, '0')}:${s % 2 ? '30' : '00'}`;
+const slotLabel = s => `${hh(s)}–${hh(s + 1)}`;
+const sum = a => a.reduce((x, y) => x + y, 0);
+const zeros = (n, m) => Array.from({ length: n }, () => new Float64Array(m));
+
+// ---------- Modelo (ESTIMADO): bajadas por simetría + trasbordo, carga por tramo ----------
+function model(V, t, L) {
+  const key = `${V.id}|${t}|${L}`;
+  if (cache[key]) return cache[key];
+  const n = V.paradas.length, km = V.km, mins = V.min_desde_inicio;
+  const bajSym = zeros(n, 48), diff = zeros(48, n + 1);
+  let sumKm = 0, sumPax = 0;
+  for (const [i, j, s, x] of V.od_trasbordo[t]) { diff[s][i] += x; diff[s][j] -= x; sumKm += x * (km[j] - km[i]); sumPax += x; }
+  // Pesos de destino: quien sube a la mañana baja donde la gente sube a la tarde (y al revés)
+  const W = {};
+  for (const per of ['am', 'pm']) {
+    const A = V.atractivo[t][per === 'am' ? 'pm' : 'am'];
+    W[per] = [];
+    for (let i = 0; i < n; i++) {
+      const w = new Float64Array(n); let tot = 0, totF = 0; const f = new Float64Array(n);
+      for (let j = i + 1; j < n; j++) {
+        const d = km[j] - km[i];
+        f[j] = d > 0 ? d * Math.exp(-2 * d / L) : 0;   // gamma k=2, media L
+        w[j] = A[j] * f[j]; tot += w[j]; totF += f[j];
+      }
+      if (tot > 0) for (let j = i + 1; j < n; j++) w[j] /= tot;
+      else if (totF > 0) for (let j = i + 1; j < n; j++) w[j] = f[j] / totF;
+      W[per].push(w);
+    }
+  }
+  const resto = V.subidas_resto[t];
+  for (let i = 0; i < n - 1; i++) for (let s = 0; s < 48; s++) {
+    const r = resto[i][s]; if (!r) continue;
+    const w = W[s < 26 ? 'am' : 'pm'][i];
+    for (let j = i + 1; j < n; j++) {
+      const x = r * w[j]; if (!x) continue;
+      bajSym[j][Math.floor((s * 30 + 15 + mins[j] - mins[i]) / 30) % 48] += x;
+      diff[s][i] += x; diff[s][j] -= x; sumKm += x * (km[j] - km[i]); sumPax += x;
+    }
+  }
+  const load = diff.map(d => { const o = new Float64Array(n); let c = 0; for (let k = 0; k < n; k++) { c += d[k]; o[k] = Math.max(c, 0); } return o; });
+  const sal = V.salidas[t], sal3 = sal.map((_, s) => (sal[(s + 47) % 48] + sal[s] + sal[(s + 1) % 48]) / 3);
+  const salDia = sum(sal);
+  // A bordo por bus en el tramo que sale de la parada k
+  const perBus = (s, k) => {
+    const b = sal3[(s - Math.floor(mins[k] / 30) + 48) % 48];
+    return b >= 0.5 ? load[s][k] / b : null;
+  };
+  const dayBus = k => salDia ? sum(load.map(l => l[k])) / salDia : null;
+  return cache[key] = { bajSym, load, perBus, dayBus, sal, salDia, largoMedio: sumPax ? sumKm / sumPax : null };
+}
+
+// ---------- Valores para la vista actual ----------
+function view() {
+  const V = D.variantes[S.v], t = S.t, M = model(V, t, S.L), n = V.paradas.length;
+  const sub = V.subidas[t], btr = V.bajadas_trasbordo[t];
+  const at = (arr, i, s) => s == null ? sum(arr[i]) : arr[i][s];
+  const val = (m, i, s) => {
+    if (m === 'subidas') return at(sub, i, s);
+    if (m === 'bajadas') return at(btr, i, s) + at(M.bajSym, i, s);
+    if (i === n - 1) return 0;
+    return s == null ? M.dayBus(i) : M.perBus(s, i);
+  };
+  // Máximo fijo para que los colores sean comparables al animar
+  let max = 0;
+  const slots = S.slot == null ? [null] : [...Array(48).keys()];
+  for (const s of slots) for (let i = 0; i < n; i++) max = Math.max(max, val(S.m, i, s) || 0);
+  return { V, M, n, val, max: max || 1 };
+}
+
+// ---------- Mapa ----------
+function rampExpr(m) {
+  const r = RAMPS[m], e = ['interpolate', ['linear'], ['get', 'q']];
+  r.forEach((c, i) => e.push(i / (r.length - 1), c));
+  return e;
+}
+let tween = { from: null, to: null, t0: 0 }, segIdx = [], markers = [];
+
+function buildGeometry() {
+  const V = D.variantes[S.v];
+  const shape = V.shape;
+  // Índice del vértice del trazado más cercano a cada parada (monótono)
+  segIdx = []; let start = 0;
+  const cosl = Math.cos(-34.88 * Math.PI / 180);
+  for (const p of V.paradas) {
+    let best = start, bd = Infinity;
+    for (let k = start; k < Math.min(shape.length, start + 400); k++) {
+      const dx = (shape[k][0] - p.lon) * cosl, dy = shape[k][1] - p.lat, d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = k; }
+    }
+    segIdx.push(best); start = best;
+  }
+  map.getSource('route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: shape } });
+  markers.forEach(m => m.remove());
+  markers = [V.paradas[0], V.paradas[V.paradas.length - 1]].map((p, i) => {
+    const el = document.createElement('div'); el.className = 'term';
+    el.textContent = i ? V.destino : V.origen.split(' - ')[0].replace(/ Y .*/, '');
+    return new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([p.lon, p.lat]).addTo(map);
+  });
+  const b = new maplibregl.LngLatBounds();
+  shape.forEach(c => b.extend(c));
+  const narrow = innerWidth < 860;
+  map.fitBounds(b, { padding: narrow ? { top: 40, bottom: 230, left: 20, right: 20 } : { top: 70, bottom: 300, left: 440, right: 280 }, duration: 900 });
+}
+
+function targetValues() {
+  const { V, n, val, max } = view();
+  const vals = [...Array(n).keys()].map(i => val(S.m, i, S.slot) || 0);
+  return { vals, max };
+}
+
+function paint(vals, max) {
+  const V = D.variantes[S.v];
+  map.getSource('stops').setData({
+    type: 'FeatureCollection',
+    features: V.paradas.map((p, i) => ({ type: 'Feature', id: i, geometry: { type: 'Point', coordinates: [p.lon, p.lat] },
+      properties: { q: Math.min(vals[i] / max, 1), r: S.m === 'abordo' ? 2 : 2.5 + 13 * Math.sqrt(Math.min(vals[i] / max, 1)) } })),
+  });
+  const segs = [];
+  if (S.m === 'abordo') for (let i = 0; i < V.paradas.length - 1; i++) {
+    const c = V.shape.slice(segIdx[i], segIdx[i + 1] + 1);
+    if (c.length > 1) segs.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: c }, properties: { q: Math.min(vals[i] / max, 1) } });
+  }
+  map.getSource('segs').setData({ type: 'FeatureCollection', features: segs });
+}
+
+function frame() {
+  const k = Math.min((performance.now() - tween.t0) / 420, 1), e = 1 - Math.pow(1 - k, 3);
+  const vals = tween.to.vals.map((v, i) => (tween.from ? tween.from[i] : 0) + (v - (tween.from ? tween.from[i] : 0)) * e);
+  tween.cur = vals;
+  paint(vals, tween.to.max);
+  if (k < 1) requestAnimationFrame(frame);
+}
+
+function updateMap(animate = true) {
+  if (!map || !map.getSource('stops')) return;
+  const to = targetValues();
+  const sameLen = tween.cur && tween.cur.length === to.vals.length;
+  tween = { from: animate && sameLen ? tween.cur : null, to, t0: performance.now(), cur: tween.cur };
+  if (!animate || !sameLen) { tween.cur = to.vals; paint(to.vals, to.max); }
+  else requestAnimationFrame(frame);
+  map.setPaintProperty('stops', 'circle-opacity', S.m === 'abordo' ? 0.9 : 0.95);
+  map.setPaintProperty('segs', 'line-color', rampExpr('abordo'));
+  map.setPaintProperty('route', 'line-opacity', S.m === 'abordo' ? 0.25 : 0.55);
+  map.setPaintProperty('stops', 'circle-stroke-width', ['case', ['boolean', ['feature-state', 'h'], false], 2.5, S.m === 'abordo' ? 0 : 1.5]);
+  map.setPaintProperty('stops', 'circle-color', S.m === 'abordo' ? ['case', ['boolean', ['feature-state', 'h'], false], '#ffffff', '#0e0e10'] : rampExpr(S.m));
+  // Leyenda
+  $('lgt').textContent = NOMBRE[S.m] + (S.slot == null ? '' : ` · ${slotLabel(S.slot)}`);
+  $('lgtag').innerHTML = S.m === 'subidas' ? '<span class="tag med">MEDIDO</span>' : '<span class="tag est">ESTIMADO</span>';
+  $('lgbar').style.background = `linear-gradient(90deg, ${RAMPS[S.m].join(',')})`;
+  $('lgmax').textContent = fmt(to.max, to.max < 10 ? 1 : 0);
+}
+
+// ---------- Panel ----------
+function renderVars() {
+  $('vars').innerHTML = D.variantes.map((V, i) => {
+    const pd = sum(V.subidas[S.t].map(sum));
+    return `<div class="var ${i === S.v ? 'on' : ''}" data-i="${i}">
+      <div class="to">→ ${V.destino}</div>
+      <div class="from">desde ${V.origen.split(/ - | Y /)[0]}</div>
+      <div class="n">${fmt(pd)}<small>subidas/día</small></div></div>`;
+  }).join('');
+  $('vars').querySelectorAll('.var').forEach(el => el.onclick = () => { S.v = +el.dataset.i; buildGeometry(); render(false); });
+}
+
+function renderKpis() {
+  const { V, M, n } = view();
+  const s = S.slot, sub = V.subidas[S.t];
+  const subT = s == null ? sum(sub.map(sum)) : sum(sub.map(r => r[s]));
+  const sal = s == null ? M.salDia : M.sal[s];
+  const peak = (L) => { const m = model(V, S.t, L); let mx = 0;
+    for (let k = 0; k < n - 1; k++) mx = Math.max(mx, (s == null ? m.dayBus(k) : m.perBus(s, k)) || 0); return mx; };
+  const pk = peak(S.L), lo = peak(Math.max(4, S.L * 0.8)), hi = peak(Math.min(20, S.L * 1.3));
+  $('kpilabel').textContent = s == null ? 'Resumen del día' : `Resumen ${slotLabel(s)}`;
+  $('kpis').innerHTML = `
+    <div class="kpi"><div class="v">${fmt(subT)}</div><div class="k">Subidas <span class="tag med">MEDIDO</span></div></div>
+    <div class="kpi"><div class="v">${fmt(sal)}</div><div class="k">Salidas programadas</div></div>
+    <div class="kpi"><div class="v">${sal ? fmt(subT / sal, 1) : '–'}</div><div class="k">Pasajeros por salida</div></div>
+    <div class="kpi"><div class="v">${fmt(pk)}</div><div class="k">Máx. a bordo/bus <span class="tag est">EST.</span></div>
+      <div class="r">rango ${fmt(Math.min(lo, hi))}–${fmt(Math.max(lo, hi))}</div></div>`;
+  const tr = sum(V.od_trasbordo[S.t].map(r => r[3])), tot = sum(sub.map(sum));
+  $('ptr').textContent = `${fmt(100 * tr / tot)}% de las subidas en este sentido`;
+}
+
+// ---------- Línea de tiempo ----------
+function svgEl(tag, attrs, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; }
+
+function renderTimeline() {
+  const box = $('tl'), W = box.clientWidth, H = box.clientHeight;
+  const { V, M, n, val } = view();
+  const series = [...Array(48).keys()].map(s => {
+    if (S.m === 'abordo') { let mx = 0; for (let k = 0; k < n - 1; k++) mx = Math.max(mx, M.perBus(s, k) || 0); return mx; }
+    let t = 0; for (let i = 0; i < n; i++) t += val(S.m, i, s) || 0; return t;
+  });
+  const max = Math.max(...series, 1), pl = 34, pb = 18, pt = 6, bw = (W - pl) / 48;
+  box.innerHTML = '';
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}` }, box);
+  const g = svgEl('g', { class: 'grid' }, svg), ax = svgEl('g', { class: 'axis' }, svg);
+  const y = v => pt + (H - pt - pb) * (1 - v / max);
+  const nice = Math.pow(10, Math.floor(Math.log10(max))), step = max / nice > 5 ? nice * 2 : max / nice > 2 ? nice : nice / 2;
+  for (let v = 0; v <= max; v += step) { svgEl('line', { x1: pl, x2: W, y1: y(v), y2: y(v) }, g); svgEl('text', { x: pl - 6, y: y(v) + 3.5, 'text-anchor': 'end' }, ax).textContent = fmt(v); }
+  for (let h = 0; h <= 24; h += 3) svgEl('text', { x: pl + h * 2 * bw, y: H - 3, 'text-anchor': h === 0 ? 'start' : h === 24 ? 'end' : 'middle' }, ax).textContent = `${h}h`;
+  const color = S.m === 'bajadas' ? RAMPS.bajadas[3] : RAMPS.subidas[3];
+  series.forEach((v, s) => {
+    const x = pl + s * bw + 1, h = Math.max(H - pb - y(v), v > 0 ? 1 : 0), on = S.slot == null || S.slot === s;
+    svgEl('rect', { x, y: H - pb - h, width: Math.max(bw - 2, 1), height: h, rx: Math.min(2, bw / 4), fill: color, opacity: on ? 1 : 0.28 }, svg);
+  });
+  if (S.slot != null) svgEl('rect', { x: pl + S.slot * bw, y: pt - 2, width: bw, height: H - pb - pt + 2, fill: 'none', stroke: 'rgba(255,255,255,.55)', 'stroke-width': 1, rx: 3 }, svg);
+  const hit = svgEl('rect', { x: pl, y: 0, width: W - pl, height: H, fill: 'transparent', style: 'cursor:pointer' }, svg);
+  const slotAt = e => Math.max(0, Math.min(47, Math.floor((e.offsetX - pl) / bw)));
+  let drag = false;
+  hit.onpointerdown = e => { drag = true; hit.setPointerCapture(e.pointerId); stop(); setSlot(slotAt(e)); };
+  hit.onpointerup = () => drag = false;
+  hit.onpointermove = e => {
+    const s = slotAt(e);
+    if (drag && s !== S.slot) setSlot(s);
+    const sal = M.sal[s];
+    const unit = S.m === 'abordo' ? 'máx. a bordo por bus' : S.m;
+    tip(`<div class="n">${slotLabel(s)}</div>
+      <div class="r">${unit[0].toUpperCase() + unit.slice(1)} <b>${fmt(series[s], S.m === 'abordo' ? 0 : 0)}</b></div>
+      <div class="r">Salidas programadas <b>${fmt(sal)}</b></div>
+      ${S.m === 'subidas' && sal ? `<div class="r">Por salida <b>${fmt(series[s] / sal, 1)}</b></div>` : ''}
+      <div class="s">Promedio por día ${S.t === 'habil' ? 'hábil' : S.t === 'sabado' ? 'sábado' : 'domingo'}</div>`, e.clientX, e.clientY);
+  };
+  hit.onpointerleave = () => hideTip();
+  $('tmeta').textContent = S.m === 'abordo' ? 'máximo a bordo por bus, cada 30 min' : `${NOMBRE[S.m].toLowerCase()}, cada 30 min`;
+}
+
+// ---------- Perfil de carga ----------
+function renderProfile() {
+  const box = $('pf'), W = box.clientWidth, H = box.clientHeight;
+  const { V, n } = view(), km = V.km, s = S.slot;
+  const prof = L => { const m = model(V, S.t, L); return [...Array(n - 1).keys()].map(k => (s == null ? m.dayBus(k) : m.perBus(s, k)) || 0); };
+  const mid = prof(S.L), a = prof(Math.max(4, S.L * 0.8)), b = prof(Math.min(20, S.L * 1.3));
+  const lo = mid.map((_, k) => Math.min(a[k], b[k], mid[k])), hi = mid.map((_, k) => Math.max(a[k], b[k], mid[k]));
+  const max = Math.max(...hi, CAPACIDAD * (Math.max(...hi) > CAPACIDAD * 0.6 ? 1 : 0), 5) * 1.08;
+  const pl = 30, pb = 18, pt = 8, xmax = km[n - 1];
+  const x = v => pl + (W - pl - 6) * v / xmax, y = v => pt + (H - pt - pb) * (1 - v / max);
+  box.innerHTML = '';
+  const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}` }, box);
+  const g = svgEl('g', { class: 'grid' }, svg), ax = svgEl('g', { class: 'axis' }, svg);
+  const step = max > 100 ? 40 : max > 40 ? 20 : max > 15 ? 5 : 2;
+  for (let v = 0; v <= max; v += step) { svgEl('line', { x1: pl, x2: W - 6, y1: y(v), y2: y(v) }, g); svgEl('text', { x: pl - 6, y: y(v) + 3.5, 'text-anchor': 'end' }, ax).textContent = v; }
+  for (let k = 0; k <= xmax; k += xmax > 12 ? 4 : 2) svgEl('text', { x: x(k), y: H - 3, 'text-anchor': 'middle' }, ax).textContent = `${k} km`;
+  // escalones: carga constante entre parada k y k+1
+  const stepPath = arr => arr.map((v, k) => `${k ? 'L' : 'M'}${x(km[k])},${y(v)}L${x(km[k + 1])},${y(v)}`).join('');
+  const band = stepPath(hi) + arr2(lo).map(([k, v]) => `L${x(km[k + 1])},${y(v)}L${x(km[k])},${y(v)}`).join('') + 'Z';
+  function arr2(arr) { return arr.map((v, k) => [k, v]).reverse(); }
+  svgEl('path', { d: band, fill: RAMPS.subidas[3], opacity: 0.16 }, svg);
+  if (max > CAPACIDAD) {
+    svgEl('line', { x1: pl, x2: W - 6, y1: y(CAPACIDAD), y2: y(CAPACIDAD), stroke: 'rgba(255,255,255,.35)', 'stroke-dasharray': '3 4' }, svg);
+    svgEl('text', { x: W - 8, y: y(CAPACIDAD) - 5, 'text-anchor': 'end', class: 'axis', fill: '#7c7b74', 'font-size': 10.5 }, svg).textContent = `≈${CAPACIDAD} lugares (supuesto)`;
+  }
+  svgEl('path', { d: stepPath(mid), fill: 'none', stroke: RAMPS.subidas[4], 'stroke-width': 2, 'stroke-linejoin': 'round' }, svg);
+  const cross = svgEl('line', { y1: pt, y2: H - pb, stroke: 'rgba(255,255,255,.4)', opacity: 0 }, svg);
+  const hit = svgEl('rect', { x: pl, y: 0, width: W - pl, height: H, fill: 'transparent' }, svg);
+  hit.onpointermove = e => {
+    const v = (e.offsetX - pl) / (W - pl - 6) * xmax;
+    let k = 0; while (k < n - 2 && km[k + 1] <= v) k++;
+    cross.setAttribute('x1', x(km[k])); cross.setAttribute('x2', x(km[k])); cross.setAttribute('opacity', 1);
+    highlight(k);
+    tip(`<div class="n">${V.paradas[k].nombre}</div>
+      <div class="r">A bordo al salir <b>${fmt(mid[k])}</b></div>
+      <div class="r">Rango (largo perilla ×0,8 a ×1,3) <b>${fmt(lo[k])}–${fmt(hi[k])}</b></div>
+      <div class="s">km ${fmt(km[k], 1)} · pasajeros por bus ${s == null ? 'promedio del día' : slotLabel(s)}</div>`, e.clientX, e.clientY);
+  };
+  hit.onpointerleave = () => { cross.setAttribute('opacity', 0); highlight(null); hideTip(); };
+  $('pmeta').textContent = s == null ? 'promedio del día' : slotLabel(s);
+}
+
+// ---------- Tooltip y resaltado ----------
+function tip(html, cx, cy) {
+  const t = $('tip'); t.innerHTML = html; t.style.opacity = 1;
+  const r = t.getBoundingClientRect();
+  let x = cx + 14, y = cy - r.height - 12;
+  if (x + r.width > innerWidth - 8) x = cx - r.width - 14;
+  if (y < 8) y = cy + 16;
+  t.style.left = x + 'px'; t.style.top = y + 'px';
+}
+function hideTip() { $('tip').style.opacity = 0; }
+function highlight(i) {
+  if (S.hover != null) map.setFeatureState({ source: 'stops', id: S.hover }, { h: false });
+  S.hover = i;
+  if (i != null) map.setFeatureState({ source: 'stops', id: i }, { h: true });
+}
+
+// ---------- Estado ----------
+function setSlot(s) { S.slot = s; render(true); }
+function render(animate = true) {
+  if (!D) return;
+  $('clock').textContent = S.slot == null ? 'Todo el día' : slotLabel(S.slot);
+  $('allday').classList.toggle('on', S.slot == null);
+  $('mhint').innerHTML = HINT[S.m];
+  $('lslider').hidden = S.m === 'subidas';
+  document.querySelectorAll('.var').forEach((el, i) => el.classList.toggle('on', i === S.v));
+  updateMap(animate); renderKpis(); renderTimeline(); renderProfile();
+  const lm = model(D.variantes[S.v], S.t, S.L).largoMedio;
+  $('lval').textContent = lm ? `${fmt(lm, 1)} km por el recorrido` : '–';
+}
+function stop() { S.playing = false; clearInterval(timer); $('play').innerHTML = PLAY; }
+function play() {
+  if (S.playing) return stop();
+  S.playing = true; $('play').innerHTML = PAUSE;
+  if (S.slot == null || S.slot >= 47) setSlot(10);
+  timer = setInterval(() => { if (S.slot >= 47) return stop(); setSlot(S.slot + 1); }, 650);
+}
+
+function seg(id, key, after) {
+  $(id).querySelectorAll('button').forEach(b => b.onclick = () => {
+    $(id).querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    S[key] = b.dataset.v; after && after(); render(true);
+  });
+}
+
+async function loadLinea(l) {
+  stop();
+  D = await fetch(`data/linea_${l}.json`).then(r => r.json());
+  cache = {}; S.v = 0; tween = { from: null, to: null, t0: 0 };
+  document.title = `Línea ${D.linea} · Cómo se mueve`;
+  history.replaceState(null, '', `?linea=${l}`);
+  if ($('lsel')) $('lsel').value = l;
+  if (map && map.getSource('stops')) { renderVars(); buildGeometry(); render(false); }
+}
+
+async function init() {
+  const lineas = await fetch('data/lineas.json').then(r => r.json());
+  lineas.sort((a, b) => a.linea.localeCompare(b.linea, 'es', { numeric: true }));
+  $('lineas').innerHTML = `<select id="lsel" class="lsel">${lineas.map(x => `<option value="${x.linea}">Línea ${x.linea} · ${fmt(x.pax_mes / 1000)} mil pasajeros/mes</option>`).join('')}</select>`;
+  $('lsel').onchange = e => loadLinea(e.target.value);
+  await loadLinea(lineas.some(x => x.linea === LINEA) ? LINEA : lineas[0].linea);
+  map = new maplibregl.Map({
+    container: 'map', style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+    center: [-56.13, -34.9], zoom: 12, attributionControl: { compact: true },
+  });
+  map.on('load', () => {
+    map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addSource('segs', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addSource('stops', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#6b6b72', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 15, 5], 'line-opacity': 0.55 } });
+    map.addLayer({ id: 'segs', type: 'line', source: 'segs', layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 6, 15, 13], 'line-color': rampExpr('abordo') } });
+    map.addLayer({ id: 'stops', type: 'circle', source: 'stops', paint: {
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, ['*', ['get', 'r'], 0.75], 15, ['*', ['get', 'r'], 1.4]],
+      'circle-color': rampExpr('subidas'), 'circle-opacity': 0.95,
+      'circle-stroke-color': ['case', ['boolean', ['feature-state', 'h'], false], '#ffffff', '#0e0e10'],
+      'circle-stroke-width': ['case', ['boolean', ['feature-state', 'h'], false], 2.5, 1.5] } });
+
+    map.on('mousemove', 'stops', e => {
+      map.getCanvas().style.cursor = 'pointer';
+      const i = e.features[0].id, { V, M, n } = view(), s = S.slot, t = S.t;
+      highlight(i);
+      const at = (arr) => s == null ? sum(arr[i]) : arr[i][s];
+      const su = at(V.subidas[t]), bt = at(V.bajadas_trasbordo[t]), bs = at(M.bajSym);
+      const ab = i < n - 1 ? (s == null ? M.dayBus(i) : M.perBus(s, i)) : 0;
+      tip(`<div class="n">${V.paradas[i].nombre}</div>
+        <div class="r">Subidas <span class="tag med">MEDIDO</span> <b>${fmt(su, 1)}</b></div>
+        <div class="r">Bajadas <span class="tag est">EST.</span> <b>${fmt(bt + bs, 1)}</b></div>
+        <div class="r" style="padding-left:10px;color:var(--text-3)">por trasbordo · simetría <b style="color:var(--text-2)">${fmt(bt, 1)} · ${fmt(bs, 1)}</b></div>
+        <div class="r">A bordo al salir <span class="tag est">EST.</span> <b>${fmt(ab)}</b></div>
+        <div class="s">Parada ${V.paradas[i].id} · km ${fmt(V.km[i], 1)} · ${s == null ? 'por día' : slotLabel(s)}</div>`,
+        e.originalEvent.clientX, e.originalEvent.clientY);
+    });
+    map.on('mouseleave', 'stops', () => { map.getCanvas().style.cursor = ''; highlight(null); hideTip(); });
+
+    renderVars(); buildGeometry(); render(false);
+  });
+
+  $('play').innerHTML = PLAY;
+  $('play').onclick = play;
+  $('allday').onclick = () => { stop(); setSlot(null); };
+  seg('tipo', 't', () => { cache = {}; renderVars(); });
+  seg('metric', 'm');
+  $('L').oninput = e => { S.L = +e.target.value; render(false); };
+  addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') { e.preventDefault(); play(); }
+    if (e.code === 'ArrowRight') { stop(); setSlot(S.slot == null ? 0 : Math.min(47, S.slot + 1)); }
+    if (e.code === 'ArrowLeft') { stop(); setSlot(S.slot == null ? 47 : Math.max(0, S.slot - 1)); }
+  });
+  new ResizeObserver(() => { if (map && map.getSource('stops')) { renderTimeline(); renderProfile(); } }).observe($('dock'));
+}
+init();
+</script>
+<script>document.querySelectorAll('.topnav a').forEach(a => { const p = location.pathname.split('/').pop() || 'index.html'; if (a.getAttribute('href') === p) a.classList.add('on'); });</script>
+
+
+</body></html>

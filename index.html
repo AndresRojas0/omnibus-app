@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+
+<html lang="es"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e0e10">
+<title>Ómnibus parejos · Montevideo</title>
+<meta name="description" content="Pausas cortas para que los ómnibus de Montevideo no se junten: simulación con datos reales del STM.">
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link href="css2" rel="stylesheet">
+<style>
+:root {
+  --surface: #0e0e10; --card: #17171a; --line: rgba(255,255,255,.08);
+  --text-1: #ececec; --text-2: #a8a8ad; --text-3: #75757b;
+  --cyan: #7fb2ff; --mint: #5fc999; --amber: #d9a35a; --pink: #7fb2ff; --red: #e5735f;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+html, body { margin: 0; background: var(--surface); color: var(--text-1); font: 15px/1.55 "IBM Plex Sans", system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: var(--cyan); text-decoration: none; }
+.tag { display: inline-block; font-size: 10px; font-weight: 600; letter-spacing: .06em; padding: 2px 7px; border-radius: 5px; border: 1px solid rgba(217,163,90,.5); color: var(--amber); vertical-align: 2px; }
+.topnav { position: fixed; top: 0; left: 0; right: 0; z-index: 50; display: flex; gap: 4px; justify-content: center; overflow-x: auto;
+  padding: 10px 12px; font-size: 12.5px; background: rgba(14,14,16,.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); scrollbar-width: none; }
+.topnav::-webkit-scrollbar { display: none; }
+.topnav a { color: var(--text-2); padding: 5px 11px; border-radius: 999px; white-space: nowrap; }
+.topnav a:hover { color: var(--text-1); background: rgba(255,255,255,.07); }
+.topnav a.on { background: var(--text-1); color: var(--surface); font-weight: 600; }
+#hero { position: relative; height: 100svh; min-height: 560px; overflow: hidden;
+  background: var(--surface); }
+#hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hero-txt { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 clamp(18px, 5vw, 64px) clamp(28px, 7vh, 72px);
+  background: linear-gradient(0deg, rgba(14,14,16,.96) 15%, rgba(14,14,16,0)); }
+.kicker { color: var(--text-3); font-weight: 600; letter-spacing: .14em; text-transform: uppercase; font-size: 12px; }
+.hero-txt h1 { font-size: clamp(30px, 5.2vw, 60px); line-height: 1.08; letter-spacing: -.02em; margin: 10px 0 14px; font-weight: 600; max-width: 900px; }
+.grad { color: var(--cyan); }
+.hero-txt p { color: var(--text-2); font-size: clamp(15px, 2vw, 19px); max-width: 720px; margin: 0 0 22px; }
+.hero-stats { display: flex; gap: clamp(16px, 4vw, 48px); flex-wrap: wrap; margin-bottom: 26px; }
+.hero-stats .v { font-size: clamp(22px, 3.4vw, 34px); font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.hero-stats .k { color: var(--text-3); font-size: 12.5px; }
+.cta { display: inline-flex; align-items: center; gap: 10px; padding: 12px 22px; border-radius: 999px; font-weight: 600; color: var(--surface);
+  background: var(--text-1); }
+.cta:hover { background: #fff; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 32px); }
+section { padding: clamp(48px, 9vh, 90px) 0 0; }
+h2 { font-size: clamp(24px, 3.6vw, 38px); letter-spacing: -.03em; line-height: 1.1; margin: 0 0 8px; font-weight: 600; }
+.sub { color: var(--text-2); max-width: 760px; margin-bottom: 26px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; position: relative; }
+.rings { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.ring { padding: 22px 18px 20px; text-align: center; }
+.ring svg { width: min(170px, 100%); height: auto; display: block; margin: 0 auto; }
+.ring .bg { stroke: rgba(255,255,255,.08); }
+.ring .fg { transition: stroke-dashoffset 1.6s cubic-bezier(.2,.8,.2,1); stroke-linecap: round; }
+.ring .pv { font-size: 32px; font-weight: 600; letter-spacing: -.02em; fill: var(--text-1); }
+.ring .t { font-weight: 700; margin-top: 10px; font-size: 15px; }
+.ring .ab { color: var(--text-3); font-size: 13px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.ring .ab b { color: var(--text-1); }
+.big { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 14px; margin-top: 14px; }
+.cnt { padding: 26px 24px; overflow: hidden; }
+.cnt .v { font-size: clamp(40px, 6.5vw, 72px); font-weight: 600; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+.cnt .u { font-size: .42em; font-weight: 600; letter-spacing: -.01em; margin-left: 6px; }
+.cnt .k { color: var(--text-2); margin-top: 10px; font-size: 15px; }
+.cnt .s { color: var(--text-3); margin-top: 4px; font-size: 13px; }
+.cnt .u { color: var(--cyan); }
+.info { position: absolute; top: 12px; right: 12px; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); background: rgba(255,255,255,.04);
+  color: var(--text-3); font: 600 12px/24px 'IBM Plex Sans', sans-serif; text-align: center; cursor: pointer; padding: 0; }
+.info:hover, .info.on { color: var(--surface); background: var(--cyan); border-color: var(--cyan); }
+#pop { position: fixed; z-index: 100; max-width: min(320px, calc(100vw - 24px)); padding: 12px 14px; border-radius: 12px; background: #222226; border: 1px solid rgba(255,255,255,.14);
+  color: var(--text-1); font-size: 13px; line-height: 1.5; box-shadow: 0 14px 40px rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .15s; }
+#pop.on { opacity: 1; }
+.cover { padding: 16px 52px 16px 18px; margin-top: 14px; color: var(--text-2); font-size: 13.5px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.cover .bar { flex: 1; min-width: 200px; height: 10px; border-radius: 5px; background: rgba(255,255,255,.07); overflow: hidden; display: flex; }
+.cover .bar i { display: block; height: 100%; }
+.sat { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.sat .card { padding: 18px; }
+.sat .v { font-size: 30px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.sat .k { color: var(--text-2); font-size: 13.5px; margin-top: 4px; }
+.sim { overflow: hidden; }
+.simbar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+select, input { all: unset; background: rgba(255,255,255,.07); padding: 9px 12px; border-radius: 10px; font-size: 14px; }
+select { cursor: pointer; font-weight: 600; max-width: 100%; }
+input { min-width: 0; flex: 1; max-width: 320px; }
+iframe { display: block; width: 100%; height: 820px; border: 0; background: var(--surface); }
+.abrir { margin-left: auto; font-size: 13px; }
+.tools { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+.tools .n { color: var(--text-3); font-size: 13px; margin-left: auto; }
+.tbl { overflow: auto; max-height: 720px; -webkit-overflow-scrolling: touch; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 13.5px; }
+th { position: sticky; top: 0; background: var(--card); color: var(--text-3); font-weight: 500; font-size: 12px; text-align: right; padding: 11px 10px; border-bottom: 1px solid var(--line); z-index: 2; white-space: nowrap; }
+td { padding: 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--card); z-index: 1; }
+th:first-child { z-index: 3; }
+tr.r { cursor: pointer; }
+tr.r:hover td { background: #1e1e22; }
+tr.sel td { background: #24262e; }
+td .arr { color: var(--text-3); padding: 0 4px; }
+td.g { color: var(--mint); font-weight: 700; }
+.hb { display: inline-block; height: 6px; border-radius: 3px; background: var(--cyan); vertical-align: middle; margin-left: 8px; }
+.ok { color: var(--mint); font-weight: 600; } .no { color: var(--red); font-weight: 600; }
+.lit { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.lit .card { padding: 18px; color: var(--text-2); font-size: 14px; }
+.lit b { color: var(--text-1); }
+.lit .big2 { font-size: 30px; font-weight: 600; color: var(--text-1); letter-spacing: -.02em; }
+details { margin-top: 14px; }
+details summary { cursor: pointer; color: var(--text-2); font-weight: 600; padding: 14px 18px; list-style: none; }
+details summary::-webkit-details-marker { display: none; }
+details summary::before { content: '＋ '; color: var(--cyan); }
+details[open] summary::before { content: '－ '; }
+details .body { padding: 0 18px 16px; color: var(--text-2); font-size: 14px; }
+footer { color: var(--text-3); font-size: 13px; padding: 50px 0 40px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-top: 1px solid var(--line); margin-top: 60px; }
+footer .autor a { color: var(--text-2); border-bottom: 1px solid var(--line); }
+footer .autor a:hover { color: var(--text-1); }
+@media (max-width: 900px) {
+  .topnav { justify-content: flex-start; }
+  .rings, .sat { grid-template-columns: repeat(2, 1fr); }
+  .big, .lit { grid-template-columns: 1fr; }
+  iframe { height: 1150px; }
+  .col-m { display: none; }
+  .ring .pv { font-size: 30px; }
+}
+@media (max-width: 700px) {
+  #hero { height: auto; min-height: 100svh; }
+  #hero canvas { bottom: auto; height: 62svh; }
+  .hero-txt { position: relative; padding-top: 52svh;
+    background: linear-gradient(180deg, rgba(14,14,16,0) 0, rgba(14,14,16,0) 34svh, rgba(14,14,16,.96) 52svh, #0e0e10 100%); }
+  .hero-txt h1 { font-size: 30px; text-shadow: 0 2px 18px rgba(14,14,16,.9); }
+  .hero-txt p { font-size: 15px; line-height: 1.5; }
+  .hero-stats { gap: 18px 24px; }
+}
+@media (prefers-reduced-motion: reduce) { .ring .fg { transition: none; } html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<nav class="topnav"><a href="index.html" class="on">Inicio</a><a href="mapa.html">Mapa de la ciudad</a><a href="animacion.html">Simulación animada</a><a href="simulador.html">Simulador detallado</a><a href="linea.html">Promedio por parada</a></nav>
+
+<header id="hero">
+  <canvas id="rayos" aria-hidden="true" width="3042" height="1458"></canvas>
+  <div class="hero-txt">
+    <div class="kicker">Montevideo · datos reales del STM</div>
+    <h1>Si cada ómnibus esperara <span class="grad">unos segundos</span>, la ciudad se movería mejor.</h1>
+    <p>Cuando los ómnibus se juntan, el primero va lleno, el de atrás casi vacío, y en la parada se espera más de lo necesario. La idea es simple: un ómnibus frena unos segundos en el lugar justo para que vuelvan a pasar parejos. Así se espera menos y se viaja más cómodo, sin agregar ni un solo ómnibus.</p>
+    <div class="hero-stats">
+      <div><div class="v" data-n="1000000" data-pre="≈ ">≈ 1.000.000</div><div class="k">viajes por día hábil</div></div>
+      <div><div class="v" data-n="1300" data-pre="≈ ">≈ 1.300</div><div class="k">ómnibus en la calle en hora pico</div></div>
+      <div><div class="v" data-n="24" data-suf=" millones">24 millones</div><div class="k">de subidas analizadas (agosto 2026)</div></div>
+    </div>
+    <a class="cta" href="#impacto">Ver el impacto ↓</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="impacto">
+    <h2>Lo que cambia para la gente</h2>
+    <div class="sub" id="redsub">Sin sumar un solo ómnibus, solo con pausas de segundos: así cambia el viaje en las líneas más usadas de Montevideo.</div>
+    <div class="rings" id="rings"><div class="card ring"><button class="info" type="button" aria-label="¿Qué es?" data-tip="Minutos que pasa una persona en la parada, desde que llega hasta que se sube. Promedio de todos los viajes.">i</button>
+    <svg viewBox="0 0 160 160" role="img" aria-label="espera en la parada: -11%"><circle class="bg" cx="80" cy="80" r="62" fill="none" stroke-width="12"></circle>
+      <circle class="fg" cx="80" cy="80" r="62" fill="none" stroke="#7fb2ff" stroke-width="12" stroke-dasharray="389.55748904513433" stroke-dashoffset="318.1386160535264" data-off="318.1386160535264" transform="rotate(-90 80 80)"></circle>
+      <text class="pv" x="80" y="92" text-anchor="middle">−11%</text></svg>
+    <div class="t">espera en la parada</div><div class="ab">9,6 → <b>8,5</b> min</div></div><div class="card ring"><button class="info" type="button" aria-label="¿Qué es?" data-tip="La espera que se pierde solo porque los ómnibus vienen desparejos. Ej.: una línea cada 10 min, si pasara pareja, hace esperar 5 min en promedio; si en la realidad se esperan 9, se pierden 4. Es lo único que las pausas pueden arreglar. Londres la usa para medir a los operadores.">i</button>
+    <svg viewBox="0 0 160 160" role="img" aria-label="espera de más por ómnibus desparejos: -25%"><circle class="bg" cx="80" cy="80" r="62" fill="none" stroke-width="12"></circle>
+      <circle class="fg" cx="80" cy="80" r="62" fill="none" stroke="#7fb2ff" stroke-width="12" stroke-dasharray="389.55748904513433" stroke-dashoffset="227.24186860966165" data-off="227.24186860966165" transform="rotate(-90 80 80)"></circle>
+      <text class="pv" x="80" y="92" text-anchor="middle">−25%</text></svg>
+    <div class="t">espera de más por ómnibus desparejos</div><div class="ab">4,1 → <b>3,0</b> min</div></div><div class="card ring"><button class="info" type="button" aria-label="¿Qué es?" data-tip="Parte del tiempo arriba del ómnibus que se viaja con más de 60 personas a bordo (la capacidad es ~80): parado y apretado.">i</button>
+    <svg viewBox="0 0 160 160" role="img" aria-label="tiempo viajando apretado: -39%"><circle class="bg" cx="80" cy="80" r="62" fill="none" stroke-width="12"></circle>
+      <circle class="fg" cx="80" cy="80" r="62" fill="none" stroke="#7fb2ff" stroke-width="12" stroke-dasharray="389.55748904513433" stroke-dashoffset="136.345121165797" data-off="136.345121165797" transform="rotate(-90 80 80)"></circle>
+      <text class="pv" x="80" y="92" text-anchor="middle">−39%</text></svg>
+    <div class="t">tiempo viajando apretado</div><div class="ab">12 → <b>7</b> % del viaje</div></div><div class="card ring"><button class="info" type="button" aria-label="¿Qué es?" data-tip="En hora pico, ómnibus que pasan casi junto con el de adelante (a menos de un tercio del intervalo normal). El de adelante va lleno y el de atrás casi vacío.">i</button>
+    <svg viewBox="0 0 160 160" role="img" aria-label="ómnibus pegados al de adelante: -45%"><circle class="bg" cx="80" cy="80" r="62" fill="none" stroke-width="12"></circle>
+      <circle class="fg" cx="80" cy="80" r="62" fill="none" stroke="#7fb2ff" stroke-width="12" stroke-dasharray="389.55748904513433" stroke-dashoffset="97.38937226128358" data-off="97.38937226128358" transform="rotate(-90 80 80)"></circle>
+      <text class="pv" x="80" y="92" text-anchor="middle">−45%</text></svg>
+    <div class="t">ómnibus pegados al de adelante</div><div class="ab">20 → <b>11</b> % en pico</div></div></div>
+    <div class="big" id="big">
+    <div class="card cnt a"><button class="info" type="button" aria-label="¿Qué es?" data-tip="Suma de lo que gana cada pasajero: menos espera en la parada, menos los segundos de más que pasan arriba los que van en un ómnibus que hace una pausa. Mes = 21 días hábiles.">i</button><div class="v"><span class="u" style="margin:0 4px 0 0">≈</span><span data-n="260000">0</span><span class="u">horas</span></div>
+      <div class="k">ahorradas por mes, sumando a todos los pasajeros</div><div class="s">≈ 32.000 jornadas de trabajo · ≈ 12.000 horas por día hábil</div></div>
+    <div class="card cnt b"><button class="info" type="button" aria-label="¿Qué es?" data-tip="Alguien que usa una línea frecuente para ir y volver todos los días hábiles (2 viajes por día, 21 días por mes).">i</button><div class="v"><span data-n="37">0</span><span class="u">min</span></div>
+      <div class="k">por mes para quien viaja todos los días</div><div class="s">≈ 52 segundos menos por viaje</div></div>
+    <div class="card cnt c"><button class="info" type="button" aria-label="¿Qué es?" data-tip="Horas-persona por día viajando con más de 60 a bordo. Las pausas reparten mejor a la gente entre los ómnibus, sin agregar ninguno.">i</button><div class="v"><span data-n="36" data-pre="−" data-suf="%">0</span></div>
+      <div class="k">horas viajando apretado</div><div class="s">≈ 14.000 horas-persona menos por día</div></div></div>
+    <div class="card cover" id="cover"><button class="info" type="button" aria-label="¿Qué es?" data-tip="Las líneas simuladas son las que pasan cada 20 minutos o menos. El resto (poco frecuentes y variantes chicas) y las líneas donde alguna parada saldría perjudicada cuentan cero: el total es un piso.">i</button><b>Cubre el 85% de los viajes</b>
+    <div class="bar"><i style="width:79.60486790646429%;background:var(--cyan)"></i><i style="width:5.154272022720718%;background:rgba(255,255,255,.22)"></i></div>
+    <span>≈ 850.000 de ≈ 1.000.000 viajes por día · pausas en 139 de 148 recorridos · el resto cuenta cero</span></div>
+  </section>
+
+  <section>
+    <h2>En las 20 líneas más llenas</h2>
+    <div class="sub">Las que más tiempo viajan con más de 60 personas a bordo. Ahí la mejora más se nota.</div>
+    <div class="sat" id="sat">
+    <div class="card"><button class="info" type="button" aria-label="¿Qué es?" data-tip="Minutos que pasa una persona en la parada, desde que llega hasta que se sube. Promedio de todos los viajes.">i</button><div class="v">-8%</div><div class="k">espera (15,0 → 13,7 min)</div></div>
+    <div class="card"><button class="info" type="button" aria-label="¿Qué es?" data-tip="Parte del tiempo arriba del ómnibus que se viaja con más de 60 personas a bordo (la capacidad es ~80): parado y apretado.">i</button><div class="v">-27%</div><div class="k">viaje apretado (24% → 18%)</div></div>
+    <div class="card"><button class="info" type="button" aria-label="¿Qué es?" data-tip="Suma de lo que gana cada pasajero: menos espera en la parada, menos los segundos de más que pasan arriba los que van en un ómnibus que hace una pausa. Mes = 21 días hábiles.">i</button><div class="v">≈ 55.000 h</div><div class="k">ahorradas por mes</div></div>
+    <div class="card"><button class="info" type="button" aria-label="¿Qué es?" data-tip="Alguien que usa una línea frecuente para ir y volver todos los días hábiles (2 viajes por día, 21 días por mes).">i</button><div class="v">42 min</div><div class="k">por mes, pasajero frecuente</div></div></div>
+  </section>
+
+  <section>
+    <h2>¿Cuándo frena un ómnibus y cuándo no?</h2>
+    <div class="sub">No es al azar. Cada ómnibus decide solo, mirando lo que pasa en vivo, y solo frena si la pausa conviene tanto a los que esperan en la parada como a los que van arriba.</div>
+    <div class="lit">
+      <div class="card"><b>1. Dónde.</b> Al salir de la terminal y en unos puntos fijos del recorrido, elegidos para poder parar sin trancar el tránsito. En una parada común casi nunca frena.</div>
+      <div class="card"><b>2. Cuándo.</b> Cuando viene muy pegado al de adelante y el de atrás viene lejos. Con unos segundos alcanza para que los huecos se igualen y vuelvan a pasar parejos.</div>
+      <div class="card"><b>3. Cuánto.</b> Poco: hasta 45 segundos en un punto, y hasta 8 minutos en la terminal, donde no hay nadie a bordo. Mirá cuánta gente lleva: si va lleno, prefiere no frenar. Y todas las pausas juntas nunca pasan del 4% del viaje.</div>
+    </div>
+  </section>
+
+  <section id="sim">
+    <h2>Mirá un día, con y sin pausas</h2>
+    <div class="sub">Izquierda: cómo funciona hoy. Derecha: con pausas. Mismos pasajeros, mismo tránsito. Dale play.</div>
+    <div class="card sim">
+      <div class="simbar"><select id="simsel" aria-label="Línea"><option value="306_3803">Línea 306 → Casabó</option><option value="306_3802">Línea 306 → Géant</option><option value="185_3795">Línea 185 → Pocitos</option><option value="468_9268">Línea 468 → La Paz</option><option value="180_1766">Línea 180 → Plaza Gerardo Cuesta</option><option value="195_1438">Línea 195 → Buceo</option><option value="174_8708">Línea 174 → Aviación Civil</option><option value="100_242">Línea 100 → Plaza España</option><option value="137_819">Línea 137 → Plaza España</option><option value="105_395">Línea 105 → Plaza Independencia</option><option value="124_650">Línea 124 → Ciudad Vieja</option><option value="110_498">Línea 110 → Puntas De Macadam</option><option value="151_9007">Línea 151 → Verdisol</option><option value="405_24">Línea 405 → Peñarol</option><option value="546_218">Línea 546 → Portones</option><option value="195_9231">Línea 195 → Playa Del Cerro</option><option value="522_184">Línea 522 → Pocitos</option><option value="526_8925">Línea 526 → Complejo América</option><option value="109_2086">Línea 109 → Géant</option><option value="175_4639">Línea 175 → Ciudadela</option><option value="181_7603">Línea 181 → Paso Molino</option><option value="145_8403">Línea 145 → Plaza España</option><option value="405_37">Línea 405 → Parque Rodó</option><option value="185_3796">Línea 185 → Casabó</option><option value="125_667">Línea 125 → Playa Del Cerro</option><option value="110_8673">Línea 110 → Plaza España</option><option value="128_4260">Línea 128 → Paso De La Arena</option><option value="174_8707">Línea 174 → Punta Carretas</option><option value="199_1448">Línea 199 → Cementerio Del Norte</option><option value="468_9267">Línea 468 → Portones</option><option value="149_4341">Línea 149 → Pocitos</option><option value="546_217">Línea 546 → Belvedere</option><option value="109_4230">Línea 109 → Plaza España</option><option value="17_3784">Línea 17 → Casabó</option><option value="163_4309">Línea 163 → Pocitos</option><option value="21_4419">Línea 21 → Portones</option><option value="103_343">Línea 103 → Plaza España</option><option value="407_52">Línea 407 → Plaza España</option><option value="427_8495">Línea 427 → Portones</option><option value="76_4879">Línea 76 → Punta Carretas</option><option value="300_8385">Línea 300 → Instrucciones Y José Belloni</option><option value="180_1767">Línea 180 → Ciudad Vieja</option><option value="402_4584">Línea 402 → Ciudadela</option><option value="192_8681">Línea 192 → Parque Rodó</option><option value="60_2392">Línea 60 → Portones</option><option value="404_4928">Línea 404 → Palacio De La Luz</option><option value="116_628">Línea 116 → Ciudad Vieja</option><option value="100_237">Línea 100 → Villa Farré</option><option value="148_8997">Línea 148 → Aviación Civil</option><option value="370_4859">Línea 370 → Portones</option><option value="76_9221">Línea 76 → Playa Del Cerro</option><option value="103_340">Línea 103 → Los Aromos</option><option value="60_2393">Línea 60 → Ciudad Vieja</option><option value="526_8924">Línea 526 → Playa Malvín</option><option value="505_4649">Línea 505 → Ciudadela</option><option value="2_7589">Línea 2 → Hospital Saint Bois</option><option value="370_9247">Línea 370 → Playa Del Cerro</option><option value="137_815">Línea 137 → Paso De La Arena</option><option value="407_49">Línea 407 → Portones</option><option value="21_4418">Línea 21 → Plaza Independencia</option><option value="456_4198">Línea 456 → Uruguay Y Florida</option><option value="130_4753">Línea 130 → Ciudadela</option><option value="494_4414">Línea 494 → Delta Del Tigre</option><option value="188_4834">Línea 188 → Ciudad Vieja</option><option value="328_8549">Línea 328 → Punta Carretas</option><option value="163_4310">Línea 163 → Paso De La Arena</option><option value="582_8922">Línea 582 → Punta Carretas</option><option value="102_3667">Línea 102 → Gruta De Lourdes</option><option value="582_8923">Línea 582 → Peñarol</option><option value="144_883">Línea 144 → Cementerio Del Norte</option><option value="538_8199">Línea 538 → Plaza España</option><option value="300_8398">Línea 300 → Plaza Zitarrosa</option><option value="130_4754">Línea 130 → La Paz</option><option value="427_8496">Línea 427 → Uam</option><option value="127_4653">Línea 127 → Delta Del Tigre</option><option value="199_1453">Línea 199 → Punta Carretas</option><option value="149_4308">Línea 149 → Manga</option><option value="111_4581">Línea 111 → Tres Cruces</option><option value="104_366">Línea 104 → Géant</option><option value="505_4650">Línea 505 → Andaluz</option><option value="125_675">Línea 125 → Ciudad Vieja</option><option value="158_3990">Línea 158 → Aduana</option><option value="102_3668">Línea 102 → Plaza España</option><option value="183_8389">Línea 183 → Paso Molino</option><option value="124_647">Línea 124 → Santa Catalina</option><option value="316_1763">Línea 316 → Pocitos</option><option value="115_8162">Línea 115 → Vista Linda</option><option value="121_7883">Línea 121 → Ciudad Vieja</option><option value="188_4835">Línea 188 → Palacio De La Luz</option><option value="111_8079">Línea 111 → Playa Malvín</option><option value="404_4929">Línea 404 → Complejo Juana De América</option><option value="148_9044">Línea 148 → Aduana</option><option value="316_1762">Línea 316 → Cno Maldonado Km 16</option><option value="330_9264">Línea 330 → Ciudadela</option><option value="330_9265">Línea 330 → Mendoza E Instrucciones</option><option value="128_4261">Línea 128 → Pocitos</option><option value="116_630">Línea 116 → Pocitos</option><option value="144_888">Línea 144 → Plaza Independencia</option><option value="456_4587">Línea 456 → Mendoza E Instrucciones</option><option value="105_1801">Línea 105 → Géant</option><option value="192_8682">Línea 192 → Manga</option><option value="402_4585">Línea 402 → Playa Malvín</option><option value="169_4636">Línea 169 → Toledo Chico</option><option value="156_4624">Línea 156 → Hipódromo</option><option value="151_9006">Línea 151 → Portones</option><option value="524_8772">Línea 524 → Tres Ombúes</option><option value="17_3783">Línea 17 → Punta Carretas</option><option value="2_7590">Línea 2 → Portones</option><option value="175_4640">Línea 175 → Las Piedras</option><option value="156_4623">Línea 156 → Ciudadela</option><option value="142_3700">Línea 142 → Rambla Costanera</option><option value="494_4415">Línea 494 → Buceo</option><option value="328_8550">Línea 328 → Mendoza E Instrucciones</option><option value="L9_1958">Línea L9 → Intercambiador Belloni</option><option value="145_8404">Línea 145 → Complejo América</option><option value="117_634">Línea 117 → Plaza Independencia</option><option value="L14_168">Línea L14 → Paso De La Arena</option><option value="409_3124">Línea 409 → Hospital Saint Bois</option><option value="D11_3924">Línea D11 → Géant</option><option value="127_3972">Línea 127 → Aduana</option><option value="121_7884">Línea 121 → Punta Carretas</option><option value="E14_8312">Línea E14 → Ciudad Vieja</option><option value="D11_3923">Línea D11 → Ciudad Vieja</option><option value="183_8401">Línea 183 → Pocitos</option><option value="524_4206">Línea 524 → Ciudad Vieja</option><option value="158_3928">Línea 158 → Gruta De Lourdes</option><option value="D8_2643">Línea D8 → Plaza Independencia</option><option value="115_8161">Línea 115 → Tres Cruces</option><option value="L14_170">Línea L14 → Paso Molino</option><option value="522_183">Línea 522 → Sayago</option><option value="L29_1944">Línea L29 → Complejo América</option><option value="169_4635">Línea 169 → Ciudadela</option><option value="L28_4792">Línea L28 → Paso Molino</option><option value="E14_8314">Línea E14 → Pocitos</option><option value="D8_3920">Línea D8 → Cno Maldonado Km 21</option><option value="409_3125">Línea 409 → Plaza España</option><option value="181_7602">Línea 181 → Pocitos</option><option value="L4_4990">Línea L4 → Terminal Del Cerro</option><option value="L15_2074">Línea L15 → Terminal Del Cerro</option><option value="104_370">Línea 104 → Plaza Independencia</option><option value="117_635">Línea 117 → Punta Carretas</option><option value="L9_1966">Línea L9 → Villa Farré</option><option value="L29_1942">Línea L29 → Belvedere</option><option value="L4_4991">Línea L4 → La Boyada</option><option value="L15_2073">Línea L15 → Pajas Blancas</option><option value="L16_3952">Línea L16 → Pajas Blancas</option><option value="113_7706">Línea 113 → Playa Malvín</option><option value="142_7899">Línea 142 → Plaza España</option></select><a class="abrir" id="abrir" href="animacion.html">Abrir en pantalla completa ↗</a></div>
+      <iframe id="frame" title="Simulación de la línea" src="saved_resource.html"></iframe>
+    </div>
+  </section>
+
+  <section>
+    <h2>Todas las líneas</h2>
+    <div class="sub">Promedio de 10 días hábiles simulados. Tocá una línea para verla en la simulación. ✓ = mejora sin perjudicar a ninguna parada; ✗ = no se aplicaría y cuenta cero.</div>
+    <div class="tools">
+      <input id="q" placeholder="Buscar línea o destino…" aria-label="Buscar">
+      <select id="orden" aria-label="Ordenar">
+        <option value="horas">Más horas ahorradas</option>
+        <option value="sat">Más llenas</option>
+        <option value="pas">Más pasajeros</option>
+        <option value="min">Más ahorro por viaje</option>
+        <option value="linea">Por número</option>
+      </select>
+      <span class="n" id="cnt">148 recorridos</span>
+    </div>
+    <div class="card tbl"><table id="tabla"><tbody><tr><th>Línea → destino</th><th>Ahorro/viaje</th><th>Horas/mes</th><th class="col-m">Espera (min)</th><th class="col-m">% apretado</th><th class="col-m">Pegados</th><th class="col-m">Viajes/día</th><th>Sin perjuicio</th></tr><tr class="r " data-id="306_3803">
+      <td><b>306</b> → Casabó</td>
+      <td class="g">−94 s</td>
+      <td class="g">5.000<span class="hb" style="width:60px"></span></td>
+      <td class="col-m">9,4<span class="arr">→</span>7,4</td>
+      <td class="col-m">23%<span class="arr">→</span>13%</td>
+      <td class="col-m">23%<span class="arr">→</span>10%</td>
+      <td class="col-m">9.200</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="306_3802">
+      <td><b>306</b> → Géant</td>
+      <td class="g">−95 s</td>
+      <td class="g">5.000<span class="hb" style="width:59.721532446763604px"></span></td>
+      <td class="col-m">8,2<span class="arr">→</span>6,5</td>
+      <td class="col-m">11%<span class="arr">→</span>3%</td>
+      <td class="col-m">21%<span class="arr">→</span>5%</td>
+      <td class="col-m">9.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="185_3795">
+      <td><b>185</b> → Pocitos</td>
+      <td class="g">−81 s</td>
+      <td class="g">4.800<span class="hb" style="width:57.447605876779804px"></span></td>
+      <td class="col-m">7,6<span class="arr">→</span>6,1</td>
+      <td class="col-m">24%<span class="arr">→</span>14%</td>
+      <td class="col-m">25%<span class="arr">→</span>8%</td>
+      <td class="col-m">10.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="468_9268">
+      <td><b>468</b> → La Paz</td>
+      <td class="g">−63 s</td>
+      <td class="g">4.100<span class="hb" style="width:48.33842132737841px"></span></td>
+      <td class="col-m">9,0<span class="arr">→</span>7,5</td>
+      <td class="col-m">15%<span class="arr">→</span>11%</td>
+      <td class="col-m">24%<span class="arr">→</span>17%</td>
+      <td class="col-m">11.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="180_1766">
+      <td><b>180</b> → Plaza Gerardo Cuesta</td>
+      <td class="g">−110 s</td>
+      <td class="g">3.900<span class="hb" style="width:45.928341433685475px"></span></td>
+      <td class="col-m">7,8<span class="arr">→</span>6,0</td>
+      <td class="col-m">8%<span class="arr">→</span>2%</td>
+      <td class="col-m">30%<span class="arr">→</span>18%</td>
+      <td class="col-m">6.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="195_1438">
+      <td><b>195</b> → Buceo</td>
+      <td class="g">−86 s</td>
+      <td class="g">3.700<span class="hb" style="width:44.36945188066312px"></span></td>
+      <td class="col-m">9,8<span class="arr">→</span>8,3</td>
+      <td class="col-m">8%<span class="arr">→</span>2%</td>
+      <td class="col-m">21%<span class="arr">→</span>4%</td>
+      <td class="col-m">7.400</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="174_8708">
+      <td><b>174</b> → Aviación Civil</td>
+      <td class="g">−69 s</td>
+      <td class="g">3.700<span class="hb" style="width:44.06701291977654px"></span></td>
+      <td class="col-m">7,8<span class="arr">→</span>6,4</td>
+      <td class="col-m">10%<span class="arr">→</span>4%</td>
+      <td class="col-m">24%<span class="arr">→</span>16%</td>
+      <td class="col-m">9.200</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="100_242">
+      <td><b>100</b> → Plaza España</td>
+      <td class="g">−88 s</td>
+      <td class="g">3.700<span class="hb" style="width:43.651411752716626px"></span></td>
+      <td class="col-m">8,0<span class="arr">→</span>6,3</td>
+      <td class="col-m">24%<span class="arr">→</span>15%</td>
+      <td class="col-m">26%<span class="arr">→</span>13%</td>
+      <td class="col-m">7.100</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="137_819">
+      <td><b>137</b> → Plaza España</td>
+      <td class="g">−74 s</td>
+      <td class="g">3.600<span class="hb" style="width:43.05206498828014px"></span></td>
+      <td class="col-m">8,1<span class="arr">→</span>6,6</td>
+      <td class="col-m">24%<span class="arr">→</span>14%</td>
+      <td class="col-m">20%<span class="arr">→</span>10%</td>
+      <td class="col-m">8.400</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="105_395">
+      <td><b>105</b> → Plaza Independencia</td>
+      <td class="g">−97 s</td>
+      <td class="g">3.600<span class="hb" style="width:43.03178943163104px"></span></td>
+      <td class="col-m">10,9<span class="arr">→</span>9,0</td>
+      <td class="col-m">30%<span class="arr">→</span>22%</td>
+      <td class="col-m">22%<span class="arr">→</span>11%</td>
+      <td class="col-m">6.400</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="124_650">
+      <td><b>124</b> → Ciudad Vieja</td>
+      <td class="g">−89 s</td>
+      <td class="g">3.600<span class="hb" style="width:42.6857594944467px"></span></td>
+      <td class="col-m">7,0<span class="arr">→</span>5,3</td>
+      <td class="col-m">25%<span class="arr">→</span>16%</td>
+      <td class="col-m">29%<span class="arr">→</span>16%</td>
+      <td class="col-m">6.900</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="110_498">
+      <td><b>110</b> → Puntas De Macadam</td>
+      <td class="g">−64 s</td>
+      <td class="g">3.500<span class="hb" style="width:42.27384241440598px"></span></td>
+      <td class="col-m">10,2<span class="arr">→</span>9,0</td>
+      <td class="col-m">23%<span class="arr">→</span>19%</td>
+      <td class="col-m">29%<span class="arr">→</span>23%</td>
+      <td class="col-m">9.500</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="151_9007">
+      <td><b>151</b> → Verdisol</td>
+      <td class="g">−71 s</td>
+      <td class="g">3.500<span class="hb" style="width:42.222066877094456px"></span></td>
+      <td class="col-m">8,9<span class="arr">→</span>7,5</td>
+      <td class="col-m">12%<span class="arr">→</span>5%</td>
+      <td class="col-m">22%<span class="arr">→</span>14%</td>
+      <td class="col-m">8.600</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="405_24">
+      <td><b>405</b> → Peñarol</td>
+      <td class="g">−65 s</td>
+      <td class="g">3.500<span class="hb" style="width:41.31099928656734px"></span></td>
+      <td class="col-m">7,9<span class="arr">→</span>6,7</td>
+      <td class="col-m">15%<span class="arr">→</span>8%</td>
+      <td class="col-m">21%<span class="arr">→</span>9%</td>
+      <td class="col-m">9.200</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="546_218">
+      <td><b>546</b> → Portones</td>
+      <td class="g">−66 s</td>
+      <td class="g">3.400<span class="hb" style="width:40.819182909660796px"></span></td>
+      <td class="col-m">7,0<span class="arr">→</span>5,7</td>
+      <td class="col-m">19%<span class="arr">→</span>11%</td>
+      <td class="col-m">21%<span class="arr">→</span>9%</td>
+      <td class="col-m">8.900</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="195_9231">
+      <td><b>195</b> → Playa Del Cerro</td>
+      <td class="g">−95 s</td>
+      <td class="g">3.300<span class="hb" style="width:39.806464753341956px"></span></td>
+      <td class="col-m">11,0<span class="arr">→</span>9,2</td>
+      <td class="col-m">15%<span class="arr">→</span>6%</td>
+      <td class="col-m">21%<span class="arr">→</span>11%</td>
+      <td class="col-m">6.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="522_184">
+      <td><b>522</b> → Pocitos</td>
+      <td class="g">−100 s</td>
+      <td class="g">3.300<span class="hb" style="width:39.51015528593859px"></span></td>
+      <td class="col-m">10,4<span class="arr">→</span>8,5</td>
+      <td class="col-m">16%<span class="arr">→</span>10%</td>
+      <td class="col-m">24%<span class="arr">→</span>6%</td>
+      <td class="col-m">5.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="526_8925">
+      <td><b>526</b> → Complejo América</td>
+      <td class="g">−62 s</td>
+      <td class="g">3.300<span class="hb" style="width:38.91477461035841px"></span></td>
+      <td class="col-m">9,1<span class="arr">→</span>7,8</td>
+      <td class="col-m">16%<span class="arr">→</span>8%</td>
+      <td class="col-m">22%<span class="arr">→</span>14%</td>
+      <td class="col-m">9.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="109_2086">
+      <td><b>109</b> → Géant</td>
+      <td class="g">−90 s</td>
+      <td class="g">3.200<span class="hb" style="width:38.72762546773112px"></span></td>
+      <td class="col-m">20,6<span class="arr">→</span>19,0</td>
+      <td class="col-m">14%<span class="arr">→</span>7%</td>
+      <td class="col-m">23%<span class="arr">→</span>18%</td>
+      <td class="col-m">6.200</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="175_4639">
+      <td><b>175</b> → Ciudadela</td>
+      <td class="g">−74 s</td>
+      <td class="g">3.200<span class="hb" style="width:38.604115212484665px"></span></td>
+      <td class="col-m">10,1<span class="arr">→</span>8,3</td>
+      <td class="col-m">27%<span class="arr">→</span>22%</td>
+      <td class="col-m">23%<span class="arr">→</span>13%</td>
+      <td class="col-m">7.500</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="181_7603">
+      <td><b>181</b> → Paso Molino</td>
+      <td class="g">−45 s</td>
+      <td class="g">3.200<span class="hb" style="width:38.37066845994989px"></span></td>
+      <td class="col-m">5,0<span class="arr">→</span>4,1</td>
+      <td class="col-m">13%<span class="arr">→</span>9%</td>
+      <td class="col-m">22%<span class="arr">→</span>20%</td>
+      <td class="col-m">12.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="145_8403">
+      <td><b>145</b> → Plaza España</td>
+      <td class="g">−55 s</td>
+      <td class="g">3.200<span class="hb" style="width:38.22676409047725px"></span></td>
+      <td class="col-m">10,6<span class="arr">→</span>9,3</td>
+      <td class="col-m">35%<span class="arr">→</span>31%</td>
+      <td class="col-m">21%<span class="arr">→</span>15%</td>
+      <td class="col-m">10.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="405_37">
+      <td><b>405</b> → Parque Rodó</td>
+      <td class="g">−55 s</td>
+      <td class="g">3.100<span class="hb" style="width:36.66588171056659px"></span></td>
+      <td class="col-m">7,4<span class="arr">→</span>6,2</td>
+      <td class="col-m">20%<span class="arr">→</span>15%</td>
+      <td class="col-m">21%<span class="arr">→</span>14%</td>
+      <td class="col-m">9.600</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="185_3796">
+      <td><b>185</b> → Casabó</td>
+      <td class="g">−53 s</td>
+      <td class="g">3.000<span class="hb" style="width:36.19966517677136px"></span></td>
+      <td class="col-m">7,3<span class="arr">→</span>6,2</td>
+      <td class="col-m">24%<span class="arr">→</span>16%</td>
+      <td class="col-m">26%<span class="arr">→</span>14%</td>
+      <td class="col-m">9.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="125_667">
+      <td><b>125</b> → Playa Del Cerro</td>
+      <td class="g">−116 s</td>
+      <td class="g">3.000<span class="hb" style="width:35.38321671155236px"></span></td>
+      <td class="col-m">11,3<span class="arr">→</span>9,3</td>
+      <td class="col-m">9%<span class="arr">→</span>2%</td>
+      <td class="col-m">16%<span class="arr">→</span>4%</td>
+      <td class="col-m">4.400</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="110_8673">
+      <td><b>110</b> → Plaza España</td>
+      <td class="g">−63 s</td>
+      <td class="g">3.000<span class="hb" style="width:35.371716209409016px"></span></td>
+      <td class="col-m">6,6<span class="arr">→</span>5,2</td>
+      <td class="col-m">21%<span class="arr">→</span>13%</td>
+      <td class="col-m">26%<span class="arr">→</span>14%</td>
+      <td class="col-m">8.100</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="128_4260">
+      <td><b>128</b> → Paso De La Arena</td>
+      <td class="g">−74 s</td>
+      <td class="g">2.900<span class="hb" style="width:34.89830912935993px"></span></td>
+      <td class="col-m">8,4<span class="arr">→</span>7,1</td>
+      <td class="col-m">11%<span class="arr">→</span>4%</td>
+      <td class="col-m">20%<span class="arr">→</span>11%</td>
+      <td class="col-m">6.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="174_8707">
+      <td><b>174</b> → Punta Carretas</td>
+      <td class="g">−55 s</td>
+      <td class="g">2.900<span class="hb" style="width:34.64820399433328px"></span></td>
+      <td class="col-m">8,1<span class="arr">→</span>6,9</td>
+      <td class="col-m">15%<span class="arr">→</span>9%</td>
+      <td class="col-m">25%<span class="arr">→</span>12%</td>
+      <td class="col-m">9.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="199_1448">
+      <td><b>199</b> → Cementerio Del Norte</td>
+      <td class="g">−83 s</td>
+      <td class="g">2.800<span class="hb" style="width:33.26089971064791px"></span></td>
+      <td class="col-m">8,6<span class="arr">→</span>7,2</td>
+      <td class="col-m">10%<span class="arr">→</span>3%</td>
+      <td class="col-m">16%<span class="arr">→</span>4%</td>
+      <td class="col-m">5.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="468_9267">
+      <td><b>468</b> → Portones</td>
+      <td class="g">−43 s</td>
+      <td class="g">2.800<span class="hb" style="width:33.09703048714212px"></span></td>
+      <td class="col-m">7,9<span class="arr">→</span>6,8</td>
+      <td class="col-m">19%<span class="arr">→</span>13%</td>
+      <td class="col-m">22%<span class="arr">→</span>17%</td>
+      <td class="col-m">11.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="149_4341">
+      <td><b>149</b> → Pocitos</td>
+      <td class="g">−63 s</td>
+      <td class="g">2.700<span class="hb" style="width:32.087133558966606px"></span></td>
+      <td class="col-m">8,2<span class="arr">→</span>6,7</td>
+      <td class="col-m">18%<span class="arr">→</span>13%</td>
+      <td class="col-m">24%<span class="arr">→</span>14%</td>
+      <td class="col-m">7.300</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="546_217">
+      <td><b>546</b> → Belvedere</td>
+      <td class="g">−52 s</td>
+      <td class="g">2.700<span class="hb" style="width:31.819115884164965px"></span></td>
+      <td class="col-m">6,8<span class="arr">→</span>5,8</td>
+      <td class="col-m">16%<span class="arr">→</span>8%</td>
+      <td class="col-m">18%<span class="arr">→</span>7%</td>
+      <td class="col-m">8.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="109_4230">
+      <td><b>109</b> → Plaza España</td>
+      <td class="g">−77 s</td>
+      <td class="g">2.700<span class="hb" style="width:31.672982532123484px"></span></td>
+      <td class="col-m">8,3<span class="arr">→</span>6,9</td>
+      <td class="col-m">18%<span class="arr">→</span>8%</td>
+      <td class="col-m">17%<span class="arr">→</span>6%</td>
+      <td class="col-m">5.900</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="17_3784">
+      <td><b>17</b> → Casabó</td>
+      <td class="g">−112 s</td>
+      <td class="g">2.600<span class="hb" style="width:31.44642404990872px"></span></td>
+      <td class="col-m">11,9<span class="arr">→</span>10,0</td>
+      <td class="col-m">10%<span class="arr">→</span>3%</td>
+      <td class="col-m">21%<span class="arr">→</span>7%</td>
+      <td class="col-m">4.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="163_4309">
+      <td><b>163</b> → Pocitos</td>
+      <td class="g">−44 s</td>
+      <td class="g">2.600<span class="hb" style="width:31.102867343925972px"></span></td>
+      <td class="col-m">6,5<span class="arr">→</span>5,6</td>
+      <td class="col-m">18%<span class="arr">→</span>10%</td>
+      <td class="col-m">18%<span class="arr">→</span>10%</td>
+      <td class="col-m">10.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="21_4419">
+      <td><b>21</b> → Portones</td>
+      <td class="g">−62 s</td>
+      <td class="g">2.500<span class="hb" style="width:30.27863867328616px"></span></td>
+      <td class="col-m">7,4<span class="arr">→</span>6,2</td>
+      <td class="col-m">11%<span class="arr">→</span>4%</td>
+      <td class="col-m">26%<span class="arr">→</span>20%</td>
+      <td class="col-m">7.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="103_343">
+      <td><b>103</b> → Plaza España</td>
+      <td class="g">−32 s</td>
+      <td class="g">2.400<span class="hb" style="width:28.302989409561437px"></span></td>
+      <td class="col-m">5,7<span class="arr">→</span>4,8</td>
+      <td class="col-m">21%<span class="arr">→</span>18%</td>
+      <td class="col-m">30%<span class="arr">→</span>20%</td>
+      <td class="col-m">13.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="407_52">
+      <td><b>407</b> → Plaza España</td>
+      <td class="g">−120 s</td>
+      <td class="g">2.400<span class="hb" style="width:28.29189096861738px"></span></td>
+      <td class="col-m">12,5<span class="arr">→</span>10,4</td>
+      <td class="col-m">11%<span class="arr">→</span>4%</td>
+      <td class="col-m">13%<span class="arr">→</span>2%</td>
+      <td class="col-m">3.400</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="427_8495">
+      <td><b>427</b> → Portones</td>
+      <td class="g">−47 s</td>
+      <td class="g">2.400<span class="hb" style="width:28.151976466262532px"></span></td>
+      <td class="col-m">8,9<span class="arr">→</span>8,0</td>
+      <td class="col-m">14%<span class="arr">→</span>9%</td>
+      <td class="col-m">19%<span class="arr">→</span>6%</td>
+      <td class="col-m">8.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="76_4879">
+      <td><b>76</b> → Punta Carretas</td>
+      <td class="g">−80 s</td>
+      <td class="g">2.300<span class="hb" style="width:27.983763872152554px"></span></td>
+      <td class="col-m">10,1<span class="arr">→</span>8,7</td>
+      <td class="col-m">12%<span class="arr">→</span>6%</td>
+      <td class="col-m">13%<span class="arr">→</span>2%</td>
+      <td class="col-m">5.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="300_8385">
+      <td><b>300</b> → Instrucciones Y José Belloni</td>
+      <td class="g">−43 s</td>
+      <td class="g">2.300<span class="hb" style="width:27.9411353314149px"></span></td>
+      <td class="col-m">7,2<span class="arr">→</span>6,3</td>
+      <td class="col-m">11%<span class="arr">→</span>5%</td>
+      <td class="col-m">17%<span class="arr">→</span>8%</td>
+      <td class="col-m">9.300</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="180_1767">
+      <td><b>180</b> → Ciudad Vieja</td>
+      <td class="g">−66 s</td>
+      <td class="g">2.300<span class="hb" style="width:27.015312453634575px"></span></td>
+      <td class="col-m">6,9<span class="arr">→</span>5,7</td>
+      <td class="col-m">12%<span class="arr">→</span>5%</td>
+      <td class="col-m">22%<span class="arr">→</span>10%</td>
+      <td class="col-m">5.900</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="402_4584">
+      <td><b>402</b> → Ciudadela</td>
+      <td class="g">−103 s</td>
+      <td class="g">2.300<span class="hb" style="width:27.006517041599775px"></span></td>
+      <td class="col-m">10,9<span class="arr">→</span>9,1</td>
+      <td class="col-m">11%<span class="arr">→</span>5%</td>
+      <td class="col-m">17%<span class="arr">→</span>4%</td>
+      <td class="col-m">3.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="192_8681">
+      <td><b>192</b> → Parque Rodó</td>
+      <td class="g">−62 s</td>
+      <td class="g">2.200<span class="hb" style="width:26.471877058779427px"></span></td>
+      <td class="col-m">6,9<span class="arr">→</span>5,6</td>
+      <td class="col-m">15%<span class="arr">→</span>9%</td>
+      <td class="col-m">27%<span class="arr">→</span>17%</td>
+      <td class="col-m">6.100</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="60_2392">
+      <td><b>60</b> → Portones</td>
+      <td class="g">−53 s</td>
+      <td class="g">2.200<span class="hb" style="width:26.34484812143762px"></span></td>
+      <td class="col-m">6,4<span class="arr">→</span>5,5</td>
+      <td class="col-m">7%<span class="arr">→</span>2%</td>
+      <td class="col-m">20%<span class="arr">→</span>14%</td>
+      <td class="col-m">7.200</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="404_4928">
+      <td><b>404</b> → Palacio De La Luz</td>
+      <td class="g">−90 s</td>
+      <td class="g">2.200<span class="hb" style="width:26.062521773534986px"></span></td>
+      <td class="col-m">9,0<span class="arr">→</span>7,6</td>
+      <td class="col-m">4%<span class="arr">→</span>0%</td>
+      <td class="col-m">14%<span class="arr">→</span>2%</td>
+      <td class="col-m">4.200</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="116_628">
+      <td><b>116</b> → Ciudad Vieja</td>
+      <td class="g">−78 s</td>
+      <td class="g">2.200<span class="hb" style="width:26.05923757847021px"></span></td>
+      <td class="col-m">6,2<span class="arr">→</span>4,8</td>
+      <td class="col-m">9%<span class="arr">→</span>1%</td>
+      <td class="col-m">21%<span class="arr">→</span>5%</td>
+      <td class="col-m">4.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="100_237">
+      <td><b>100</b> → Villa Farré</td>
+      <td class="g">−56 s</td>
+      <td class="g">2.200<span class="hb" style="width:25.79009661025575px"></span></td>
+      <td class="col-m">9,8<span class="arr">→</span>8,7</td>
+      <td class="col-m">11%<span class="arr">→</span>5%</td>
+      <td class="col-m">23%<span class="arr">→</span>17%</td>
+      <td class="col-m">6.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="148_8997">
+      <td><b>148</b> → Aviación Civil</td>
+      <td class="g">−89 s</td>
+      <td class="g">2.100<span class="hb" style="width:25.416732977539993px"></span></td>
+      <td class="col-m">8,8<span class="arr">→</span>7,1</td>
+      <td class="col-m">8%<span class="arr">→</span>2%</td>
+      <td class="col-m">22%<span class="arr">→</span>11%</td>
+      <td class="col-m">4.100</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="370_4859">
+      <td><b>370</b> → Portones</td>
+      <td class="g">−44 s</td>
+      <td class="g">2.100<span class="hb" style="width:25.37255321811644px"></span></td>
+      <td class="col-m">7,7<span class="arr">→</span>6,8</td>
+      <td class="col-m">9%<span class="arr">→</span>3%</td>
+      <td class="col-m">16%<span class="arr">→</span>5%</td>
+      <td class="col-m">8.400</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="76_9221">
+      <td><b>76</b> → Playa Del Cerro</td>
+      <td class="g">−75 s</td>
+      <td class="g">2.100<span class="hb" style="width:24.856739027174697px"></span></td>
+      <td class="col-m">12,1<span class="arr">→</span>10,7</td>
+      <td class="col-m">12%<span class="arr">→</span>6%</td>
+      <td class="col-m">22%<span class="arr">→</span>10%</td>
+      <td class="col-m">4.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="103_340">
+      <td><b>103</b> → Los Aromos</td>
+      <td class="g">−28 s</td>
+      <td class="g">2.100<span class="hb" style="width:24.787841264408556px"></span></td>
+      <td class="col-m">5,2<span class="arr">→</span>4,3</td>
+      <td class="col-m">10%<span class="arr">→</span>6%</td>
+      <td class="col-m">23%<span class="arr">→</span>20%</td>
+      <td class="col-m">13.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="60_2393">
+      <td><b>60</b> → Ciudad Vieja</td>
+      <td class="g">−54 s</td>
+      <td class="g">2.000<span class="hb" style="width:24.234607557197876px"></span></td>
+      <td class="col-m">7,2<span class="arr">→</span>6,1</td>
+      <td class="col-m">11%<span class="arr">→</span>6%</td>
+      <td class="col-m">19%<span class="arr">→</span>8%</td>
+      <td class="col-m">6.500</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="526_8924">
+      <td><b>526</b> → Playa Malvín</td>
+      <td class="g">−37 s</td>
+      <td class="g">2.000<span class="hb" style="width:24.118447830016805px"></span></td>
+      <td class="col-m">7,5<span class="arr">→</span>6,6</td>
+      <td class="col-m">16%<span class="arr">→</span>11%</td>
+      <td class="col-m">21%<span class="arr">→</span>8%</td>
+      <td class="col-m">9.400</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="505_4649">
+      <td><b>505</b> → Ciudadela</td>
+      <td class="g">−45 s</td>
+      <td class="g">2.000<span class="hb" style="width:23.92804740644449px"></span></td>
+      <td class="col-m">6,8<span class="arr">→</span>6,0</td>
+      <td class="col-m">23%<span class="arr">→</span>14%</td>
+      <td class="col-m">15%<span class="arr">→</span>5%</td>
+      <td class="col-m">7.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="2_7589">
+      <td><b>2</b> → Hospital Saint Bois</td>
+      <td class="g">−53 s</td>
+      <td class="g">2.000<span class="hb" style="width:23.857534432267908px"></span></td>
+      <td class="col-m">10,2<span class="arr">→</span>9,1</td>
+      <td class="col-m">6%<span class="arr">→</span>3%</td>
+      <td class="col-m">16%<span class="arr">→</span>6%</td>
+      <td class="col-m">6.400</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="370_9247">
+      <td><b>370</b> → Playa Del Cerro</td>
+      <td class="g">−39 s</td>
+      <td class="g">2.000<span class="hb" style="width:23.62877429162676px"></span></td>
+      <td class="col-m">8,8<span class="arr">→</span>7,8</td>
+      <td class="col-m">14%<span class="arr">→</span>8%</td>
+      <td class="col-m">14%<span class="arr">→</span>5%</td>
+      <td class="col-m">8.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="137_815">
+      <td><b>137</b> → Paso De La Arena</td>
+      <td class="g">−40 s</td>
+      <td class="g">2.000<span class="hb" style="width:23.47643431275929px"></span></td>
+      <td class="col-m">7,3<span class="arr">→</span>6,3</td>
+      <td class="col-m">17%<span class="arr">→</span>9%</td>
+      <td class="col-m">18%<span class="arr">→</span>15%</td>
+      <td class="col-m">8.400</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="407_49">
+      <td><b>407</b> → Portones</td>
+      <td class="g">−99 s</td>
+      <td class="g">2.000<span class="hb" style="width:23.250601734977906px"></span></td>
+      <td class="col-m">15,3<span class="arr">→</span>13,6</td>
+      <td class="col-m">5%<span class="arr">→</span>2%</td>
+      <td class="col-m">14%<span class="arr">→</span>5%</td>
+      <td class="col-m">3.400</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="456_4198">
+      <td><b>456</b> → Uruguay Y Florida</td>
+      <td class="g">−92 s</td>
+      <td class="g">1.900<span class="hb" style="width:22.909969922014984px"></span></td>
+      <td class="col-m">11,0<span class="arr">→</span>9,2</td>
+      <td class="col-m">19%<span class="arr">→</span>12%</td>
+      <td class="col-m">18%<span class="arr">→</span>7%</td>
+      <td class="col-m">3.600</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="130_4753">
+      <td><b>130</b> → Ciudadela</td>
+      <td class="g">−51 s</td>
+      <td class="g">1.900<span class="hb" style="width:22.532372173548815px"></span></td>
+      <td class="col-m">9,1<span class="arr">→</span>8,0</td>
+      <td class="col-m">13%<span class="arr">→</span>9%</td>
+      <td class="col-m">25%<span class="arr">→</span>16%</td>
+      <td class="col-m">6.300</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="494_4414">
+      <td><b>494</b> → Delta Del Tigre</td>
+      <td class="g">−42 s</td>
+      <td class="g">1.900<span class="hb" style="width:22.47911737807943px"></span></td>
+      <td class="col-m">8,5<span class="arr">→</span>7,8</td>
+      <td class="col-m">4%<span class="arr">→</span>1%</td>
+      <td class="col-m">15%<span class="arr">→</span>5%</td>
+      <td class="col-m">7.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="188_4834">
+      <td><b>188</b> → Ciudad Vieja</td>
+      <td class="g">−107 s</td>
+      <td class="g">1.900<span class="hb" style="width:22.383598141285834px"></span></td>
+      <td class="col-m">10,2<span class="arr">→</span>8,4</td>
+      <td class="col-m">5%<span class="arr">→</span>2%</td>
+      <td class="col-m">20%<span class="arr">→</span>8%</td>
+      <td class="col-m">3.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="328_8549">
+      <td><b>328</b> → Punta Carretas</td>
+      <td class="g">−97 s</td>
+      <td class="g">1.900<span class="hb" style="width:22.209549736079328px"></span></td>
+      <td class="col-m">12,4<span class="arr">→</span>10,7</td>
+      <td class="col-m">14%<span class="arr">→</span>8%</td>
+      <td class="col-m">21%<span class="arr">→</span>7%</td>
+      <td class="col-m">3.300</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="163_4310">
+      <td><b>163</b> → Paso De La Arena</td>
+      <td class="g">−38 s</td>
+      <td class="g">1.800<span class="hb" style="width:21.972007824616526px"></span></td>
+      <td class="col-m">6,8<span class="arr">→</span>5,9</td>
+      <td class="col-m">5%<span class="arr">→</span>2%</td>
+      <td class="col-m">25%<span class="arr">→</span>14%</td>
+      <td class="col-m">8.200</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="582_8922">
+      <td><b>582</b> → Punta Carretas</td>
+      <td class="g">−42 s</td>
+      <td class="g">1.800<span class="hb" style="width:21.723167693097512px"></span></td>
+      <td class="col-m">6,5<span class="arr">→</span>5,7</td>
+      <td class="col-m">16%<span class="arr">→</span>10%</td>
+      <td class="col-m">18%<span class="arr">→</span>8%</td>
+      <td class="col-m">7.500</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="102_3667">
+      <td><b>102</b> → Gruta De Lourdes</td>
+      <td class="g">−40 s</td>
+      <td class="g">1.800<span class="hb" style="width:20.956282552552885px"></span></td>
+      <td class="col-m">7,3<span class="arr">→</span>6,5</td>
+      <td class="col-m">12%<span class="arr">→</span>5%</td>
+      <td class="col-m">21%<span class="arr">→</span>17%</td>
+      <td class="col-m">7.600</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="582_8923">
+      <td><b>582</b> → Peñarol</td>
+      <td class="g">−43 s</td>
+      <td class="g">1.800<span class="hb" style="width:20.918061583725294px"></span></td>
+      <td class="col-m">7,0<span class="arr">→</span>6,3</td>
+      <td class="col-m">3%<span class="arr">→</span>1%</td>
+      <td class="col-m">18%<span class="arr">→</span>7%</td>
+      <td class="col-m">7.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="144_883">
+      <td><b>144</b> → Cementerio Del Norte</td>
+      <td class="g">−56 s</td>
+      <td class="g">1.700<span class="hb" style="width:20.722607904154675px"></span></td>
+      <td class="col-m">7,9<span class="arr">→</span>6,9</td>
+      <td class="col-m">10%<span class="arr">→</span>4%</td>
+      <td class="col-m">16%<span class="arr">→</span>7%</td>
+      <td class="col-m">5.300</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="538_8199">
+      <td><b>538</b> → Plaza España</td>
+      <td class="g">−105 s</td>
+      <td class="g">1.700<span class="hb" style="width:20.409772545063426px"></span></td>
+      <td class="col-m">13,0<span class="arr">→</span>11,2</td>
+      <td class="col-m">8%<span class="arr">→</span>3%</td>
+      <td class="col-m">17%<span class="arr">→</span>4%</td>
+      <td class="col-m">2.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="300_8398">
+      <td><b>300</b> → Plaza Zitarrosa</td>
+      <td class="g">−32 s</td>
+      <td class="g">1.700<span class="hb" style="width:20.206296413819235px"></span></td>
+      <td class="col-m">6,9<span class="arr">→</span>6,1</td>
+      <td class="col-m">12%<span class="arr">→</span>6%</td>
+      <td class="col-m">19%<span class="arr">→</span>10%</td>
+      <td class="col-m">9.100</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="130_4754">
+      <td><b>130</b> → La Paz</td>
+      <td class="g">−50 s</td>
+      <td class="g">1.700<span class="hb" style="width:20.05512499049375px"></span></td>
+      <td class="col-m">8,3<span class="arr">→</span>7,2</td>
+      <td class="col-m">5%<span class="arr">→</span>2%</td>
+      <td class="col-m">23%<span class="arr">→</span>19%</td>
+      <td class="col-m">5.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="127_4653">
+      <td><b>127</b> → Delta Del Tigre</td>
+      <td class="g">−70 s</td>
+      <td class="g">1.600<span class="hb" style="width:19.443991842465557px"></span></td>
+      <td class="col-m">8,6<span class="arr">→</span>7,3</td>
+      <td class="col-m">3%<span class="arr">→</span>1%</td>
+      <td class="col-m">21%<span class="arr">→</span>11%</td>
+      <td class="col-m">4.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="199_1453">
+      <td><b>199</b> → Punta Carretas</td>
+      <td class="g">−48 s</td>
+      <td class="g">1.600<span class="hb" style="width:19.18280728910398px"></span></td>
+      <td class="col-m">7,9<span class="arr">→</span>7,1</td>
+      <td class="col-m">12%<span class="arr">→</span>7%</td>
+      <td class="col-m">9%<span class="arr">→</span>2%</td>
+      <td class="col-m">5.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="149_4308">
+      <td><b>149</b> → Manga</td>
+      <td class="g">−36 s</td>
+      <td class="g">1.600<span class="hb" style="width:19.092333340505302px"></span></td>
+      <td class="col-m">8,0<span class="arr">→</span>7,2</td>
+      <td class="col-m">8%<span class="arr">→</span>5%</td>
+      <td class="col-m">24%<span class="arr">→</span>18%</td>
+      <td class="col-m">7.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="111_4581">
+      <td><b>111</b> → Tres Cruces</td>
+      <td class="g">−103 s</td>
+      <td class="g">1.600<span class="hb" style="width:19.052468417772282px"></span></td>
+      <td class="col-m">11,8<span class="arr">→</span>10,1</td>
+      <td class="col-m">4%<span class="arr">→</span>1%</td>
+      <td class="col-m">14%<span class="arr">→</span>4%</td>
+      <td class="col-m">2.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="104_366">
+      <td><b>104</b> → Géant</td>
+      <td class="g">−93 s</td>
+      <td class="g">1.500<span class="hb" style="width:18.093733088884832px"></span></td>
+      <td class="col-m">10,3<span class="arr">→</span>8,7</td>
+      <td class="col-m">1%<span class="arr">→</span>0%</td>
+      <td class="col-m">16%<span class="arr">→</span>6%</td>
+      <td class="col-m">2.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="505_4650">
+      <td><b>505</b> → Andaluz</td>
+      <td class="g">−36 s</td>
+      <td class="g">1.500<span class="hb" style="width:18.044282523229118px"></span></td>
+      <td class="col-m">7,2<span class="arr">→</span>6,4</td>
+      <td class="col-m">11%<span class="arr">→</span>5%</td>
+      <td class="col-m">20%<span class="arr">→</span>12%</td>
+      <td class="col-m">7.200</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="125_675">
+      <td><b>125</b> → Ciudad Vieja</td>
+      <td class="g">−79 s</td>
+      <td class="g">1.500<span class="hb" style="width:17.82752927826716px"></span></td>
+      <td class="col-m">10,1<span class="arr">→</span>8,7</td>
+      <td class="col-m">4%<span class="arr">→</span>1%</td>
+      <td class="col-m">13%<span class="arr">→</span>4%</td>
+      <td class="col-m">3.300</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="158_3990">
+      <td><b>158</b> → Aduana</td>
+      <td class="g">−38 s</td>
+      <td class="g">1.500<span class="hb" style="width:17.82617967420822px"></span></td>
+      <td class="col-m">75,6<span class="arr">→</span>74,9</td>
+      <td class="col-m">21%<span class="arr">→</span>18%</td>
+      <td class="col-m">22%<span class="arr">→</span>18%</td>
+      <td class="col-m">6.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="124_647">
+      <td><b>124</b> → Santa Catalina</td>
+      <td class="g">−35 s</td>
+      <td class="g">1.500<span class="hb" style="width:17.59870844048505px"></span></td>
+      <td class="col-m">6,2<span class="arr">→</span>5,5</td>
+      <td class="col-m">10%<span class="arr">→</span>4%</td>
+      <td class="col-m">20%<span class="arr">→</span>12%</td>
+      <td class="col-m">7.200</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="316_1763">
+      <td><b>316</b> → Pocitos</td>
+      <td class="g">−42 s</td>
+      <td class="g">1.500<span class="hb" style="width:17.552138006314944px"></span></td>
+      <td class="col-m">6,4<span class="arr">→</span>5,6</td>
+      <td class="col-m">7%<span class="arr">→</span>2%</td>
+      <td class="col-m">16%<span class="arr">→</span>2%</td>
+      <td class="col-m">6.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="115_8162">
+      <td><b>115</b> → Vista Linda</td>
+      <td class="g">−92 s</td>
+      <td class="g">1.500<span class="hb" style="width:17.38022697479647px"></span></td>
+      <td class="col-m">11,4<span class="arr">→</span>9,9</td>
+      <td class="col-m">3%<span class="arr">→</span>1%</td>
+      <td class="col-m">19%<span class="arr">→</span>9%</td>
+      <td class="col-m">2.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="121_7883">
+      <td><b>121</b> → Ciudad Vieja</td>
+      <td class="g">−43 s</td>
+      <td class="g">1.400<span class="hb" style="width:17.267831805277147px"></span></td>
+      <td class="col-m">5,7<span class="arr">→</span>4,9</td>
+      <td class="col-m">6%<span class="arr">→</span>2%</td>
+      <td class="col-m">22%<span class="arr">→</span>10%</td>
+      <td class="col-m">5.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="188_4835">
+      <td><b>188</b> → Palacio De La Luz</td>
+      <td class="g">−83 s</td>
+      <td class="g">1.400<span class="hb" style="width:17.23698631083127px"></span></td>
+      <td class="col-m">9,2<span class="arr">→</span>7,9</td>
+      <td class="col-m">1%<span class="arr">→</span>0%</td>
+      <td class="col-m">17%<span class="arr">→</span>4%</td>
+      <td class="col-m">3.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="111_8079">
+      <td><b>111</b> → Playa Malvín</td>
+      <td class="g">−89 s</td>
+      <td class="g">1.400<span class="hb" style="width:16.85915415876696px"></span></td>
+      <td class="col-m">11,5<span class="arr">→</span>9,8</td>
+      <td class="col-m">2%<span class="arr">→</span>0%</td>
+      <td class="col-m">15%<span class="arr">→</span>8%</td>
+      <td class="col-m">2.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="404_4929">
+      <td><b>404</b> → Complejo Juana De América</td>
+      <td class="g">−64 s</td>
+      <td class="g">1.400<span class="hb" style="width:16.54266958743998px"></span></td>
+      <td class="col-m">9,1<span class="arr">→</span>8,0</td>
+      <td class="col-m">4%<span class="arr">→</span>1%</td>
+      <td class="col-m">13%<span class="arr">→</span>4%</td>
+      <td class="col-m">3.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="148_9044">
+      <td><b>148</b> → Aduana</td>
+      <td class="g">−57 s</td>
+      <td class="g">1.400<span class="hb" style="width:16.527921934260192px"></span></td>
+      <td class="col-m">47,0<span class="arr">→</span>46,0</td>
+      <td class="col-m">23%<span class="arr">→</span>15%</td>
+      <td class="col-m">14%<span class="arr">→</span>2%</td>
+      <td class="col-m">4.100</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="316_1762">
+      <td><b>316</b> → Cno Maldonado Km 16</td>
+      <td class="g">−41 s</td>
+      <td class="g">1.400<span class="hb" style="width:16.49255665119681px"></span></td>
+      <td class="col-m">7,1<span class="arr">→</span>6,3</td>
+      <td class="col-m">2%<span class="arr">→</span>0%</td>
+      <td class="col-m">17%<span class="arr">→</span>7%</td>
+      <td class="col-m">5.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="330_9264">
+      <td><b>330</b> → Ciudadela</td>
+      <td class="g">−96 s</td>
+      <td class="g">1.400<span class="hb" style="width:16.421101390407976px"></span></td>
+      <td class="col-m">12,5<span class="arr">→</span>10,6</td>
+      <td class="col-m">9%<span class="arr">→</span>3%</td>
+      <td class="col-m">14%<span class="arr">→</span>4%</td>
+      <td class="col-m">2.400</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="330_9265">
+      <td><b>330</b> → Mendoza E Instrucciones</td>
+      <td class="g">−116 s</td>
+      <td class="g">1.400<span class="hb" style="width:16.419553884468176px"></span></td>
+      <td class="col-m">13,9<span class="arr">→</span>11,8</td>
+      <td class="col-m">1%<span class="arr">→</span>0%</td>
+      <td class="col-m">15%<span class="arr">→</span>2%</td>
+      <td class="col-m">2.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="128_4261">
+      <td><b>128</b> → Pocitos</td>
+      <td class="g">−33 s</td>
+      <td class="g">1.400<span class="hb" style="width:16.27072920868001px"></span></td>
+      <td class="col-m">6,9<span class="arr">→</span>6,1</td>
+      <td class="col-m">11%<span class="arr">→</span>6%</td>
+      <td class="col-m">18%<span class="arr">→</span>16%</td>
+      <td class="col-m">7.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="116_630">
+      <td><b>116</b> → Pocitos</td>
+      <td class="g">−51 s</td>
+      <td class="g">1.300<span class="hb" style="width:16.090195720691387px"></span></td>
+      <td class="col-m">5,5<span class="arr">→</span>4,6</td>
+      <td class="col-m">2%<span class="arr">→</span>0%</td>
+      <td class="col-m">17%<span class="arr">→</span>5%</td>
+      <td class="col-m">4.600</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="144_888">
+      <td><b>144</b> → Plaza Independencia</td>
+      <td class="g">−38 s</td>
+      <td class="g">1.300<span class="hb" style="width:15.903862047282088px"></span></td>
+      <td class="col-m">7,9<span class="arr">→</span>7,1</td>
+      <td class="col-m">19%<span class="arr">→</span>13%</td>
+      <td class="col-m">12%<span class="arr">→</span>5%</td>
+      <td class="col-m">6.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="456_4587">
+      <td><b>456</b> → Mendoza E Instrucciones</td>
+      <td class="g">−68 s</td>
+      <td class="g">1.300<span class="hb" style="width:15.689097833029894px"></span></td>
+      <td class="col-m">11,1<span class="arr">→</span>10,0</td>
+      <td class="col-m">3%<span class="arr">→</span>0%</td>
+      <td class="col-m">8%<span class="arr">→</span>1%</td>
+      <td class="col-m">3.300</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="105_1801">
+      <td><b>105</b> → Géant</td>
+      <td class="g">−36 s</td>
+      <td class="g">1.300<span class="hb" style="width:15.532481563285147px"></span></td>
+      <td class="col-m">7,7<span class="arr">→</span>7,0</td>
+      <td class="col-m">4%<span class="arr">→</span>1%</td>
+      <td class="col-m">20%<span class="arr">→</span>19%</td>
+      <td class="col-m">6.100</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="192_8682">
+      <td><b>192</b> → Manga</td>
+      <td class="g">−36 s</td>
+      <td class="g">1.300<span class="hb" style="width:15.082571577145252px"></span></td>
+      <td class="col-m">6,7<span class="arr">→</span>6,0</td>
+      <td class="col-m">11%<span class="arr">→</span>6%</td>
+      <td class="col-m">18%<span class="arr">→</span>13%</td>
+      <td class="col-m">6.100</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="402_4585">
+      <td><b>402</b> → Playa Malvín</td>
+      <td class="g">−61 s</td>
+      <td class="g">1.200<span class="hb" style="width:14.860988675274836px"></span></td>
+      <td class="col-m">9,8<span class="arr">→</span>8,7</td>
+      <td class="col-m">6%<span class="arr">→</span>3%</td>
+      <td class="col-m">14%<span class="arr">→</span>6%</td>
+      <td class="col-m">3.500</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="169_4636">
+      <td><b>169</b> → Toledo Chico</td>
+      <td class="g">−31 s</td>
+      <td class="g">1.200<span class="hb" style="width:14.632667264415069px"></span></td>
+      <td class="col-m">6,5<span class="arr">→</span>5,8</td>
+      <td class="col-m">10%<span class="arr">→</span>6%</td>
+      <td class="col-m">23%<span class="arr">→</span>15%</td>
+      <td class="col-m">6.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="156_4624">
+      <td><b>156</b> → Hipódromo</td>
+      <td class="g">−61 s</td>
+      <td class="g">1.200<span class="hb" style="width:14.141290660196079px"></span></td>
+      <td class="col-m">8,9<span class="arr">→</span>7,7</td>
+      <td class="col-m">1%<span class="arr">→</span>0%</td>
+      <td class="col-m">14%<span class="arr">→</span>6%</td>
+      <td class="col-m">3.300</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="151_9006">
+      <td><b>151</b> → Portones</td>
+      <td class="g">−26 s</td>
+      <td class="g">1.200<span class="hb" style="width:14.101741654610002px"></span></td>
+      <td class="col-m">7,7<span class="arr">→</span>7,0</td>
+      <td class="col-m">8%<span class="arr">→</span>6%</td>
+      <td class="col-m">24%<span class="arr">→</span>14%</td>
+      <td class="col-m">8.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="524_8772">
+      <td><b>524</b> → Tres Ombúes</td>
+      <td class="g">−87 s</td>
+      <td class="g">1.200<span class="hb" style="width:14.05640639683012px"></span></td>
+      <td class="col-m">13,3<span class="arr">→</span>11,8</td>
+      <td class="col-m">1%<span class="arr">→</span>0%</td>
+      <td class="col-m">13%<span class="arr">→</span>6%</td>
+      <td class="col-m">2.300</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="17_3783">
+      <td><b>17</b> → Punta Carretas</td>
+      <td class="g">−51 s</td>
+      <td class="g">1.200<span class="hb" style="width:13.951193513747516px"></span></td>
+      <td class="col-m">9,3<span class="arr">→</span>8,3</td>
+      <td class="col-m">6%<span class="arr">→</span>2%</td>
+      <td class="col-m">12%<span class="arr">→</span>3%</td>
+      <td class="col-m">3.900</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="2_7590">
+      <td><b>2</b> → Portones</td>
+      <td class="g">−30 s</td>
+      <td class="g">1.200<span class="hb" style="width:13.715535925211741px"></span></td>
+      <td class="col-m">8,6<span class="arr">→</span>7,9</td>
+      <td class="col-m">10%<span class="arr">→</span>7%</td>
+      <td class="col-m">16%<span class="arr">→</span>7%</td>
+      <td class="col-m">6.600</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="175_4640">
+      <td><b>175</b> → Las Piedras</td>
+      <td class="g">−24 s</td>
+      <td class="g">1.100<span class="hb" style="width:12.843304367874312px"></span></td>
+      <td class="col-m">7,2<span class="arr">→</span>6,6</td>
+      <td class="col-m">3%<span class="arr">→</span>2%</td>
+      <td class="col-m">20%<span class="arr">→</span>16%</td>
+      <td class="col-m">7.600</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="156_4623">
+      <td><b>156</b> → Ciudadela</td>
+      <td class="g">−51 s</td>
+      <td class="g">940<span class="hb" style="width:11.215213149218389px"></span></td>
+      <td class="col-m">8,0<span class="arr">→</span>7,1</td>
+      <td class="col-m">5%<span class="arr">→</span>1%</td>
+      <td class="col-m">9%<span class="arr">→</span>2%</td>
+      <td class="col-m">3.200</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="142_3700">
+      <td><b>142</b> → Rambla Costanera</td>
+      <td class="g">−44 s</td>
+      <td class="g">940<span class="hb" style="width:11.194654130663414px"></span></td>
+      <td class="col-m">10,0<span class="arr">→</span>9,2</td>
+      <td class="col-m">1%<span class="arr">→</span>0%</td>
+      <td class="col-m">14%<span class="arr">→</span>6%</td>
+      <td class="col-m">3.600</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="494_4415">
+      <td><b>494</b> → Buceo</td>
+      <td class="g">−21 s</td>
+      <td class="g">920<span class="hb" style="width:10.91758711702477px"></span></td>
+      <td class="col-m">9,1<span class="arr">→</span>8,5</td>
+      <td class="col-m">12%<span class="arr">→</span>12%</td>
+      <td class="col-m">10%<span class="arr">→</span>6%</td>
+      <td class="col-m">7.300</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="328_8550">
+      <td><b>328</b> → Mendoza E Instrucciones</td>
+      <td class="g">−56 s</td>
+      <td class="g">870<span class="hb" style="width:10.41774340764355px"></span></td>
+      <td class="col-m">14,7<span class="arr">→</span>13,7</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">8%<span class="arr">→</span>2%</td>
+      <td class="col-m">2.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="L9_1958">
+      <td><b>L9</b> → Intercambiador Belloni</td>
+      <td class="g">−95 s</td>
+      <td class="g">840<span class="hb" style="width:9.981253204789928px"></span></td>
+      <td class="col-m">9,5<span class="arr">→</span>7,9</td>
+      <td class="col-m">1%<span class="arr">→</span>0%</td>
+      <td class="col-m">13%<span class="arr">→</span>2%</td>
+      <td class="col-m">1.500</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="145_8404">
+      <td><b>145</b> → Complejo América</td>
+      <td class="g">−14 s</td>
+      <td class="g">830<span class="hb" style="width:9.864677566615232px"></span></td>
+      <td class="col-m">7,8<span class="arr">→</span>7,3</td>
+      <td class="col-m">13%<span class="arr">→</span>11%</td>
+      <td class="col-m">24%<span class="arr">→</span>17%</td>
+      <td class="col-m">10.000</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="117_634">
+      <td><b>117</b> → Plaza Independencia</td>
+      <td class="g">−82 s</td>
+      <td class="g">800<span class="hb" style="width:9.525503986821144px"></span></td>
+      <td class="col-m">12,5<span class="arr">→</span>11,2</td>
+      <td class="col-m">2%<span class="arr">→</span>1%</td>
+      <td class="col-m">11%<span class="arr">→</span>1%</td>
+      <td class="col-m">1.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="L14_168">
+      <td><b>L14</b> → Paso De La Arena</td>
+      <td class="g">−52 s</td>
+      <td class="g">800<span class="hb" style="width:9.524929971247175px"></span></td>
+      <td class="col-m">6,4<span class="arr">→</span>5,3</td>
+      <td class="col-m">3%<span class="arr">→</span>1%</td>
+      <td class="col-m">17%<span class="arr">→</span>9%</td>
+      <td class="col-m">2.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="409_3124">
+      <td><b>409</b> → Hospital Saint Bois</td>
+      <td class="g">−33 s</td>
+      <td class="g">790<span class="hb" style="width:9.39789335811572px"></span></td>
+      <td class="col-m">10,0<span class="arr">→</span>9,4</td>
+      <td class="col-m">1%<span class="arr">→</span>0%</td>
+      <td class="col-m">14%<span class="arr">→</span>7%</td>
+      <td class="col-m">4.100</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="D11_3924">
+      <td><b>D11</b> → Géant</td>
+      <td class="g">−98 s</td>
+      <td class="g">790<span class="hb" style="width:9.391758274655249px"></span></td>
+      <td class="col-m">10,3<span class="arr">→</span>8,6</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">18%<span class="arr">→</span>5%</td>
+      <td class="col-m">1.400</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="127_3972">
+      <td><b>127</b> → Aduana</td>
+      <td class="g">−29 s</td>
+      <td class="g">780<span class="hb" style="width:9.34308041906326px"></span></td>
+      <td class="col-m">75,8<span class="arr">→</span>75,1</td>
+      <td class="col-m">20%<span class="arr">→</span>21%</td>
+      <td class="col-m">16%<span class="arr">→</span>12%</td>
+      <td class="col-m">4.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="121_7884">
+      <td><b>121</b> → Punta Carretas</td>
+      <td class="g">−23 s</td>
+      <td class="g">760<span class="hb" style="width:9.01900928913913px"></span></td>
+      <td class="col-m">4,7<span class="arr">→</span>4,3</td>
+      <td class="col-m">1%<span class="arr">→</span>0%</td>
+      <td class="col-m">11%<span class="arr">→</span>5%</td>
+      <td class="col-m">5.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="E14_8312">
+      <td><b>E14</b> → Ciudad Vieja</td>
+      <td class="g">−110 s</td>
+      <td class="g">720<span class="hb" style="width:8.598437005373489px"></span></td>
+      <td class="col-m">11,6<span class="arr">→</span>9,7</td>
+      <td class="col-m">2%<span class="arr">→</span>0%</td>
+      <td class="col-m">10%<span class="arr">→</span>2%</td>
+      <td class="col-m">1.100</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="D11_3923">
+      <td><b>D11</b> → Ciudad Vieja</td>
+      <td class="g">−79 s</td>
+      <td class="g">680<span class="hb" style="width:8.160222628269334px"></span></td>
+      <td class="col-m">10,1<span class="arr">→</span>8,5</td>
+      <td class="col-m">2%<span class="arr">→</span>1%</td>
+      <td class="col-m">14%<span class="arr">→</span>4%</td>
+      <td class="col-m">1.500</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="183_8401">
+      <td><b>183</b> → Pocitos</td>
+      <td class="g">−13 s</td>
+      <td class="g">670<span class="hb" style="width:8.015231049938533px"></span></td>
+      <td class="col-m">3,6<span class="arr">→</span>3,3</td>
+      <td class="col-m">2%<span class="arr">→</span>1%</td>
+      <td class="col-m">18%<span class="arr">→</span>10%</td>
+      <td class="col-m">8.900</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="524_4206">
+      <td><b>524</b> → Ciudad Vieja</td>
+      <td class="g">−43 s</td>
+      <td class="g">650<span class="hb" style="width:7.753902158358503px"></span></td>
+      <td class="col-m">12,8<span class="arr">→</span>12,0</td>
+      <td class="col-m">16%<span class="arr">→</span>15%</td>
+      <td class="col-m">4%<span class="arr">→</span>1%</td>
+      <td class="col-m">2.600</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="158_3928">
+      <td><b>158</b> → Gruta De Lourdes</td>
+      <td class="g">−16 s</td>
+      <td class="g">650<span class="hb" style="width:7.749649854323849px"></span></td>
+      <td class="col-m">6,3<span class="arr">→</span>5,8</td>
+      <td class="col-m">3%<span class="arr">→</span>2%</td>
+      <td class="col-m">21%<span class="arr">→</span>14%</td>
+      <td class="col-m">6.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="115_8161">
+      <td><b>115</b> → Tres Cruces</td>
+      <td class="g">−35 s</td>
+      <td class="g">590<span class="hb" style="width:7.038412728686319px"></span></td>
+      <td class="col-m">15,9<span class="arr">→</span>15,2</td>
+      <td class="col-m">15%<span class="arr">→</span>14%</td>
+      <td class="col-m">13%<span class="arr">→</span>4%</td>
+      <td class="col-m">2.900</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="L14_170">
+      <td><b>L14</b> → Paso Molino</td>
+      <td class="g">−37 s</td>
+      <td class="g">570<span class="hb" style="width:6.847912394699805px"></span></td>
+      <td class="col-m">5,9<span class="arr">→</span>5,2</td>
+      <td class="col-m">2%<span class="arr">→</span>1%</td>
+      <td class="col-m">9%<span class="arr">→</span>4%</td>
+      <td class="col-m">2.700</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="522_183">
+      <td><b>522</b> → Sayago</td>
+      <td class="g">−16 s</td>
+      <td class="g">560<span class="hb" style="width:6.616240209643254px"></span></td>
+      <td class="col-m">10,3<span class="arr">→</span>10,0</td>
+      <td class="col-m">3%<span class="arr">→</span>1%</td>
+      <td class="col-m">7%<span class="arr">→</span>2%</td>
+      <td class="col-m">5.900</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="L29_1944">
+      <td><b>L29</b> → Complejo América</td>
+      <td class="g">−66 s</td>
+      <td class="g">540<span class="hb" style="width:6.491760051628365px"></span></td>
+      <td class="col-m">14,6<span class="arr">→</span>13,1</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">6%<span class="arr">→</span>1%</td>
+      <td class="col-m">1.400</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="L28_4792">
+      <td><b>L28</b> → Paso Molino</td>
+      <td class="g">−84 s</td>
+      <td class="g">540<span class="hb" style="width:6.407823998581893px"></span></td>
+      <td class="col-m">14,7<span class="arr">→</span>13,3</td>
+      <td class="col-m">4%<span class="arr">→</span>0%</td>
+      <td class="col-m">6%<span class="arr">→</span>0%</td>
+      <td class="col-m">1.100</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="E14_8314">
+      <td><b>E14</b> → Pocitos</td>
+      <td class="g">−102 s</td>
+      <td class="g">530<span class="hb" style="width:6.287252152419699px"></span></td>
+      <td class="col-m">11,1<span class="arr">→</span>9,4</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">11%<span class="arr">→</span>2%</td>
+      <td class="col-m">890</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="D8_3920">
+      <td><b>D8</b> → Cno Maldonado Km 21</td>
+      <td class="g">−53 s</td>
+      <td class="g">490<span class="hb" style="width:5.877931116214958px"></span></td>
+      <td class="col-m">8,9<span class="arr">→</span>7,9</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">13%<span class="arr">→</span>6%</td>
+      <td class="col-m">1.600</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="409_3125">
+      <td><b>409</b> → Plaza España</td>
+      <td class="g">−17 s</td>
+      <td class="g">470<span class="hb" style="width:5.6151468281709525px"></span></td>
+      <td class="col-m">9,5<span class="arr">→</span>9,1</td>
+      <td class="col-m">12%<span class="arr">→</span>11%</td>
+      <td class="col-m">14%<span class="arr">→</span>7%</td>
+      <td class="col-m">4.800</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="181_7602">
+      <td><b>181</b> → Pocitos</td>
+      <td class="g">−9 s</td>
+      <td class="g">430<span class="hb" style="width:5.167114240060867px"></span></td>
+      <td class="col-m">3,7<span class="arr">→</span>3,5</td>
+      <td class="col-m">1%<span class="arr">→</span>0%</td>
+      <td class="col-m">17%<span class="arr">→</span>12%</td>
+      <td class="col-m">8.500</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="L4_4990">
+      <td><b>L4</b> → Terminal Del Cerro</td>
+      <td class="g">−46 s</td>
+      <td class="g">420<span class="hb" style="width:4.9734438049481104px"></span></td>
+      <td class="col-m">6,8<span class="arr">→</span>6,0</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">10%<span class="arr">→</span>2%</td>
+      <td class="col-m">1.600</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="L15_2074">
+      <td><b>L15</b> → Terminal Del Cerro</td>
+      <td class="g">−54 s</td>
+      <td class="g">410<span class="hb" style="width:4.904614164815177px"></span></td>
+      <td class="col-m">10,0<span class="arr">→</span>9,1</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">1.300</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="117_635">
+      <td><b>117</b> → Punta Carretas</td>
+      <td class="g">−50 s</td>
+      <td class="g">380<span class="hb" style="width:4.501055227096574px"></span></td>
+      <td class="col-m">10,9<span class="arr">→</span>9,9</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">8%<span class="arr">→</span>4%</td>
+      <td class="col-m">1.300</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="L9_1966">
+      <td><b>L9</b> → Villa Farré</td>
+      <td class="g">−42 s</td>
+      <td class="g">330<span class="hb" style="width:3.9181478348493397px"></span></td>
+      <td class="col-m">8,4<span class="arr">→</span>7,2</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">8%<span class="arr">→</span>3%</td>
+      <td class="col-m">1.300</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="L4_4991">
+      <td><b>L4</b> → La Boyada</td>
+      <td class="g">−19 s</td>
+      <td class="g">170<span class="hb" style="width:2.0194579154050722px"></span></td>
+      <td class="col-m">6,6<span class="arr">→</span>5,7</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">11%<span class="arr">→</span>7%</td>
+      <td class="col-m">1.500</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="L15_2073">
+      <td><b>L15</b> → Pajas Blancas</td>
+      <td class="g">−4 s</td>
+      <td class="g">41<span class="hb" style="width:0.4911475403006412px"></span></td>
+      <td class="col-m">9,9<span class="arr">→</span>9,7</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">1%<span class="arr">→</span>1%</td>
+      <td class="col-m">1.900</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="L16_3952">
+      <td><b>L16</b> → Pajas Blancas</td>
+      <td class="g">−10 s</td>
+      <td class="g">32<span class="hb" style="width:0.3804128860372408px"></span></td>
+      <td class="col-m">12,4<span class="arr">→</span>12,0</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">540</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="113_7706">
+      <td><b>113</b> → Playa Malvín</td>
+      <td class="g">−1 s</td>
+      <td class="g">3<span class="hb" style="width:0.03957666345858062px"></span></td>
+      <td class="col-m">13,5<span class="arr">→</span>13,4</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">11%<span class="arr">→</span>12%</td>
+      <td class="col-m">410</td>
+      <td><span class="ok">✓</span></td></tr><tr class="r " data-id="21_4418">
+      <td><b>21</b> → Plaza Independencia</td>
+      <td class="g">−58 s</td>
+      <td class="g"><span style="color:var(--text-3)">0</span><span class="hb" style="width:0px"></span></td>
+      <td class="col-m">7,3<span class="arr">→</span>5,9</td>
+      <td class="col-m">12%<span class="arr">→</span>6%</td>
+      <td class="col-m">23%<span class="arr">→</span>16%</td>
+      <td class="col-m">5.800</td>
+      <td><span class="no">✗</span></td></tr><tr class="r " data-id="427_8496">
+      <td><b>427</b> → Uam</td>
+      <td class="g">−39 s</td>
+      <td class="g"><span style="color:var(--text-3)">0</span><span class="hb" style="width:0px"></span></td>
+      <td class="col-m">10,2<span class="arr">→</span>9,3</td>
+      <td class="col-m">6%<span class="arr">→</span>5%</td>
+      <td class="col-m">16%<span class="arr">→</span>11%</td>
+      <td class="col-m">7.200</td>
+      <td><span class="no">✗</span></td></tr><tr class="r " data-id="102_3668">
+      <td><b>102</b> → Plaza España</td>
+      <td class="g">−33 s</td>
+      <td class="g"><span style="color:var(--text-3)">0</span><span class="hb" style="width:0px"></span></td>
+      <td class="col-m">23,1<span class="arr">→</span>22,3</td>
+      <td class="col-m">29%<span class="arr">→</span>23%</td>
+      <td class="col-m">20%<span class="arr">→</span>9%</td>
+      <td class="col-m">7.800</td>
+      <td><span class="no">✗</span></td></tr><tr class="r " data-id="183_8389">
+      <td><b>183</b> → Paso Molino</td>
+      <td class="g">−23 s</td>
+      <td class="g"><span style="color:var(--text-3)">0</span><span class="hb" style="width:0px"></span></td>
+      <td class="col-m">4,9<span class="arr">→</span>4,2</td>
+      <td class="col-m">10%<span class="arr">→</span>6%</td>
+      <td class="col-m">24%<span class="arr">→</span>18%</td>
+      <td class="col-m">11.000</td>
+      <td><span class="no">✗</span></td></tr><tr class="r " data-id="D8_2643">
+      <td><b>D8</b> → Plaza Independencia</td>
+      <td class="g">−52 s</td>
+      <td class="g"><span style="color:var(--text-3)">0</span><span class="hb" style="width:0px"></span></td>
+      <td class="col-m">18,7<span class="arr">→</span>17,6</td>
+      <td class="col-m">5%<span class="arr">→</span>3%</td>
+      <td class="col-m">18%<span class="arr">→</span>8%</td>
+      <td class="col-m">2.000</td>
+      <td><span class="no">✗</span></td></tr><tr class="r " data-id="169_4635">
+      <td><b>169</b> → Ciudadela</td>
+      <td class="g">−13 s</td>
+      <td class="g"><span style="color:var(--text-3)">0</span><span class="hb" style="width:0px"></span></td>
+      <td class="col-m">8,4<span class="arr">→</span>7,9</td>
+      <td class="col-m">21%<span class="arr">→</span>19%</td>
+      <td class="col-m">18%<span class="arr">→</span>13%</td>
+      <td class="col-m">7.100</td>
+      <td><span class="no">✗</span></td></tr><tr class="r " data-id="104_370">
+      <td><b>104</b> → Plaza Independencia</td>
+      <td class="g">−21 s</td>
+      <td class="g"><span style="color:var(--text-3)">0</span><span class="hb" style="width:0px"></span></td>
+      <td class="col-m">10,2<span class="arr">→</span>9,7</td>
+      <td class="col-m">9%<span class="arr">→</span>8%</td>
+      <td class="col-m">14%<span class="arr">→</span>13%</td>
+      <td class="col-m">3.200</td>
+      <td><span class="no">✗</span></td></tr><tr class="r " data-id="L29_1942">
+      <td><b>L29</b> → Belvedere</td>
+      <td class="g">−22 s</td>
+      <td class="g"><span style="color:var(--text-3)">0</span><span class="hb" style="width:0px"></span></td>
+      <td class="col-m">13,3<span class="arr">→</span>12,8</td>
+      <td class="col-m">0%<span class="arr">→</span>0%</td>
+      <td class="col-m">8%<span class="arr">→</span>4%</td>
+      <td class="col-m">1.500</td>
+      <td><span class="no">✗</span></td></tr><tr class="r " data-id="142_7899">
+      <td><b>142</b> → Plaza España</td>
+      <td class="">+2 s</td>
+      <td class="g"><span style="color:var(--text-3)">0</span><span class="hb" style="width:0px"></span></td>
+      <td class="col-m">10,4<span class="arr">→</span>10,1</td>
+      <td class="col-m">11%<span class="arr">→</span>11%</td>
+      <td class="col-m">13%<span class="arr">→</span>15%</td>
+      <td class="col-m">3.600</td>
+      <td><span class="no">✗</span></td></tr></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>¿Esto existe? Sí.</h2>
+    <div class="sub">El control para que los ómnibus pasen parejos se usa en varias ciudades.</div>
+    <div class="lit">
+      <div class="card"><div class="big2">−38%</div><b>Estocolmo.</b> Pausas para emparejar con el de adelante y el de atrás, con una pantalla para el chofer. Bajó 38% la espera de más; desde 2015 en todas las troncales del centro (<a href="https://www.researchgate.net/publication/262726593_A_Field_Experiment_for_Improving_Bus_Service_Regularity_RETT3_final_report">Cats et al.</a>).</div>
+      <div class="card"><div class="big2">15%</div><b>Londres.</b> La "espera de más" es el indicador de regularidad; los operadores cobran bonos de hasta 15% del contrato por cumplirlo (<a href="https://www.london.gov.uk/media/28216/download">GLA</a>).</div>
+      <div class="card"><div class="big2">80%</div><b>Santiago y Bogotá.</b> Santiago exige 80% de cumplimiento de regularidad en los contratos; Bogotá regula frecuencias en vivo (<a href="https://www.latercera.com/nacional/noticia/stp-lidera-ranking-frecuencia-regularidad-empresas-operadoras-del-transantiago/682544/">La Tercera</a>, <a href="https://www.transmilenio.gov.co/comunicaciones/noticias-de-transmilenio/comunicados-oficiales/bogota-estrena-el-centro-de-control-integrado-de-transmilenio">TransMilenio</a>).</div>
+    </div>
+    <details class="card"><summary>Cómo se calcula</summary><div class="body">
+      <p><b>Datos reales:</b> 24 millones de subidas de agosto 2026 (tarjeta STM), horarios GTFS y la Encuesta Origen-Destino 2016 para estimar dónde baja la gente.</p>
+      <p><b>Simulación:</b> cada línea frecuente (cada 20 min o menos) se simula un día hábil completo, 10 veces, con los mismos pasajeros y el mismo tránsito con y sin pausas. Calibrada para que sin pausas los ómnibus se junten como en agosto.</p>
+      <p><b>La regla:</b> en 19 puntos del recorrido el ómnibus espera hasta 45 s si viene pegado al de adelante y lejos del de atrás; en la terminal, hasta 8 min. Espera menos cuanta más gente lleva, y nunca más del 4% del viaje. Usa solo información que existe en vivo.</p>
+      <p><b>Ahorro:</b> minutos de espera ganados menos los segundos de más arriba del ómnibus. Variantes que comparten recorrido se cuentan una sola vez.</p>
+      <p><b>Límites:</b> sin validar todavía con posiciones reales. Supone que la gente llega a la parada al azar (razonable en líneas frecuentes). Capacidad 80. Mes = 21 días hábiles; fines de semana no incluidos.</p>
+    </div></details>
+  </section>
+  <footer><div>Prueba de concepto con datos abiertos de la Intendencia de Montevideo. Todo es <span class="tag">ESTIMADO</span>.</div><div class="autor">Hecho por <b>Tomás Sanz</b> · <a href="https://www.linkedin.com/in/tomassanz/" target="_blank" rel="noopener">LinkedIn</a> · <a href="https://x.com/tomi_sanz" target="_blank" rel="noopener">X / Twitter</a></div></footer>
+</main>
+<div id="pop" role="tooltip"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (x, d = 0) => x == null || !isFinite(x) ? '–' : x.toLocaleString('es-UY', { minimumFractionDigits: d, maximumFractionDigits: d });
+const aprox = x => { const a = Math.abs(x), p = a >= 100000 ? 10000 : a >= 10000 ? 1000 : a >= 1000 ? 100 : a >= 100 ? 10 : 1; return Math.round(x / p) * p; };
+const cambio = (a, b) => Math.round(100 * (b / a - 1));
+const MOVIL = matchMedia('(max-width: 900px)').matches, QUIETO = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let IMP, IDX, filas, sel = null;
+
+// ---------- portada: rayos de luz por las rutas de ómnibus
+async function rayos() {
+  const cv = $('rayos'), ctx = cv.getContext('2d');
+  const G = await fetch('data/hero.json').then(r => r.json()), rutas = G.rutas;
+  let W, H, base;
+  const kx = Math.cos(-34.85 * Math.PI / 180);
+  // encuadre: área metropolitana
+  const lon0 = -56.48, lon1 = -55.92, lat0 = -34.93, lat1 = -34.66;
+  function layout() {
+    const dpr = Math.min(devicePixelRatio || 1, 2); W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const vertical = H > W;
+    const s = vertical ? W / ((lon1 - lon0) * kx) * 1.55 : Math.min(W / ((lon1 - lon0) * kx), H / (lat1 - lat0)) * 1.0;
+    const cx = (lon0 + lon1) / 2, cy = (lat0 + lat1) / 2;
+    const ox = vertical ? W * 0.52 : W * 0.62, oy = vertical ? (W <= 700 ? H * 0.46 : H * 0.22) : H * 0.40;
+    const proj = p => [ox + (p[0] - cx) * kx * s, oy - (p[1] - cy) * s];
+    for (const r of rutas) { r.xy = r.p.map(proj); r.cum = [0]; for (let i = 1; i < r.xy.length; i++) r.cum.push(r.cum[i - 1] + Math.hypot(r.xy[i][0] - r.xy[i - 1][0], r.xy[i][1] - r.xy[i - 1][1])); r.L = r.cum[r.cum.length - 1]; }
+    base = document.createElement('canvas'); base.width = W * dpr; base.height = H * dpr;
+    const b = base.getContext('2d'); b.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const poly = (rings, fill, stroke, lw, dash) => {
+      b.beginPath();
+      for (const ring of rings) ring.forEach((p, i) => { const q = proj(p); i ? b.lineTo(q[0], q[1]) : b.moveTo(q[0], q[1]); });
+      if (fill) { b.fillStyle = fill; b.fill('evenodd'); }
+      if (stroke) { b.setLineDash(dash || []); b.strokeStyle = stroke; b.lineWidth = lw; b.stroke(); b.setLineDash([]); }
+    };
+    poly(G.tierra, '#151517', 'rgba(255,255,255,.16)', 1);       // tierra y costa
+    poly(G.urbano, '#1c1c20', null);                                // mancha urbana
+    poly(G.mvd, null, 'rgba(255,255,255,.14)', 1, [3, 4]);          // límite de Montevideo
+    b.lineJoin = 'round';
+    for (const r of rutas) {                                        // red de ómnibus, más marcada donde hay más gente
+      b.strokeStyle = `rgba(127,178,255,${Math.min(.06 + r.w / 60000, .22)})`; b.lineWidth = r.w > 6000 ? 1.4 : 0.9;
+      b.beginPath(); r.xy.forEach((q, i) => i ? b.lineTo(q[0], q[1]) : b.moveTo(q[0], q[1])); b.stroke();
+    }
+    b.fillStyle = 'rgba(255,255,255,.28)'; b.font = '500 11px "IBM Plex Sans", sans-serif'; b.textAlign = 'center';
+    for (const [n, lo, la] of [['Río de la Plata', -56.20, -34.935], ['Montevideo', -56.17, -34.885], ['Canelones', -56.02, -34.72], ['San José', -56.43, -34.70]]) { const q = proj([lo, la]); b.fillText(n.toUpperCase(), q[0], q[1]); }
+  }
+  layout(); addEventListener('resize', layout);
+  const tot = rutas.reduce((a, r) => a + r.w, 0);
+  const pick = () => { let x = Math.random() * tot; for (const r of rutas) { x -= r.w; if (x <= 0) return r; } return rutas[0]; };
+  const COL = [[170, 200, 255], [127, 178, 255], [235, 235, 240]];
+  const nuevo = azar => { const r = pick(), c = COL[Math.floor(Math.random() * COL.length)]; return { r, d: azar ? Math.random() * r.L : 0, v: 40 + Math.random() * 90, len: 30 + Math.random() * 70, c, a: .45 + Math.random() * .4 }; };
+  const rs = Array.from({ length: MOVIL ? 90 : 180 }, () => nuevo(true));
+  const punto = (r, d) => { let i = 1; while (i < r.cum.length - 1 && r.cum[i] < d) i++; const f = (d - r.cum[i - 1]) / ((r.cum[i] - r.cum[i - 1]) || 1), p = r.xy[i - 1], q = r.xy[i]; return [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f]; };
+  let last = performance.now(), visible = true;
+  new IntersectionObserver(e => visible = e[0].isIntersecting).observe(cv);
+  function frame(t) {
+    const dt = Math.min((t - last) / 1000, .05); last = t;
+    if (visible) {
+      ctx.globalCompositeOperation = 'source-over'; ctx.clearRect(0, 0, W, H); ctx.drawImage(base, 0, 0, W, H);
+      ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+      for (let k = 0; k < rs.length; k++) {
+        const z = rs[k]; if (!QUIETO) z.d += z.v * dt;
+        if (z.d > z.r.L + z.len) { rs[k] = nuevo(false); continue; }
+        const n = 7, a0 = Math.max(0, z.d - z.len); let prev = punto(z.r, a0);
+        for (let j = 1; j <= n; j++) {
+          const p = punto(z.r, Math.min(z.d, a0 + (z.d - a0) * j / n));
+          ctx.strokeStyle = `rgba(${z.c[0]},${z.c[1]},${z.c[2]},${z.a * (j / n) ** 2})`; ctx.lineWidth = .8 + 1.4 * (j / n);
+          ctx.beginPath(); ctx.moveTo(prev[0], prev[1]); ctx.lineTo(p[0], p[1]); ctx.stroke(); prev = p;
+        }
+        ctx.fillStyle = `rgba(${z.c[0]},${z.c[1]},${z.c[2]},${z.a})`; ctx.beginPath(); ctx.arc(prev[0], prev[1], 1.8, 0, 7); ctx.fill();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+// ---------- contadores animados
+function contar(el, n, ms = 1600) {
+  const pre = el.dataset.pre || '', suf = el.dataset.suf || '', t0 = performance.now();
+  if (QUIETO) { el.textContent = pre + fmt(n) + suf; return; }
+  const paso = t => { const k = Math.min((t - t0) / ms, 1), e = 1 - Math.pow(1 - k, 3); el.textContent = pre + fmt(k < 1 ? aprox(n * e) : n) + suf; if (k < 1) requestAnimationFrame(paso); };
+  requestAnimationFrame(paso);
+}
+function alVer(el, fn) { new IntersectionObserver((e, o) => { if (e[0].isIntersecting) { fn(); o.disconnect(); } }, { threshold: .25 }).observe(el); }
+
+// ---------- explicaciones: "i" que se abre al pasar el mouse o al tocar
+const pop = $('pop');
+const info = t => `<button class="info" type="button" aria-label="¿Qué es?" data-tip="${t.replace(/"/g, '&quot;')}">i</button>`;
+function mostrar(b) {
+  document.querySelectorAll('.info.on').forEach(x => x !== b && x.classList.remove('on'));
+  pop.textContent = b.dataset.tip; pop.classList.add('on'); b.classList.add('on');
+  const r = b.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = Math.min(Math.max(8, r.right - w), innerWidth - w - 8) + 'px';
+  pop.style.top = (r.bottom + 8 + h > innerHeight - 8 ? r.top - h - 8 : r.bottom + 8) + 'px';
+}
+function ocultar() { pop.classList.remove('on'); document.querySelectorAll('.info.on').forEach(x => x.classList.remove('on')); }
+const hover = matchMedia('(hover: hover)');
+document.addEventListener('mouseover', e => { const b = e.target.closest('.info'); if (b && hover.matches) mostrar(b); });
+document.addEventListener('mouseout', e => { if (e.target.closest('.info') && hover.matches) ocultar(); });
+document.addEventListener('click', e => { const b = e.target.closest('.info'); if (b) { e.stopPropagation(); b.classList.contains('on') ? ocultar() : mostrar(b); } else ocultar(); });
+addEventListener('scroll', ocultar, { passive: true });
+
+const Q = {
+  espera: 'Minutos que pasa una persona en la parada, desde que llega hasta que se sube. Promedio de todos los viajes.',
+  ewt: 'La espera que se pierde solo porque los ómnibus vienen desparejos. Ej.: una línea cada 10 min, si pasara pareja, hace esperar 5 min en promedio; si en la realidad se esperan 9, se pierden 4. Es lo único que las pausas pueden arreglar. Londres la usa para medir a los operadores.',
+  apretado: 'Parte del tiempo arriba del ómnibus que se viaja con más de 60 personas a bordo (la capacidad es ~80): parado y apretado.',
+  pegados: 'En hora pico, ómnibus que pasan casi junto con el de adelante (a menos de un tercio del intervalo normal). El de adelante va lleno y el de atrás casi vacío.',
+  horas: 'Suma de lo que gana cada pasajero: menos espera en la parada, menos los segundos de más que pasan arriba los que van en un ómnibus que hace una pausa. Mes = 21 días hábiles.',
+  frecuente: 'Alguien que usa una línea frecuente para ir y volver todos los días hábiles (2 viajes por día, 21 días por mes).',
+  hapretado: 'Horas-persona por día viajando con más de 60 a bordo. Las pausas reparten mejor a la gente entre los ómnibus, sin agregar ninguno.',
+  cobertura: 'Las líneas simuladas son las que pasan cada 20 minutos o menos. El resto (poco frecuentes y variantes chicas) y las líneas donde alguna parada saldría perjudicada cuentan cero: el total es un piso.',
+};
+
+// ---------- anillos y números grandes
+function anillo(p, titulo, a, b, unidad, que, color) {
+  const R = 62, C = 2 * Math.PI * R, frac = Math.min(Math.abs(p) / 60, 1);
+  return `<div class="card ring">${info(que)}
+    <svg viewBox="0 0 160 160" role="img" aria-label="${titulo}: ${p}%"><circle class="bg" cx="80" cy="80" r="${R}" fill="none" stroke-width="12"/>
+      <circle class="fg" cx="80" cy="80" r="${R}" fill="none" stroke="${color}" stroke-width="12" stroke-dasharray="${C}" stroke-dashoffset="${QUIETO ? C * (1 - frac) : C}" data-off="${C * (1 - frac)}" transform="rotate(-90 80 80)" />
+      <text class="pv" x="80" y="92" text-anchor="middle">${p > 0 ? '+' : '−'}${Math.abs(p)}%</text></svg>
+    <div class="t">${titulo}</div><div class="ab">${a} → <b>${b}</b> ${unidad}</div></div>`;
+}
+function render() {
+  const R = IMP.red, S = R.seguro, T = R.saturadas, apCon = R.horas_apretado_sin - S.horas_apretado_evitadas_dia;
+  $('redsub').textContent = 'Sin sumar un solo ómnibus, solo con pausas de segundos: así cambia el viaje en las líneas más usadas de Montevideo.';
+  $('rings').innerHTML =
+    anillo(cambio(R.espera_sin, R.espera_con), 'espera en la parada', fmt(R.espera_sin, 1), fmt(R.espera_con, 1), 'min', Q.espera, '#7fb2ff') +
+    anillo(cambio(R.ewt_sin, R.ewt_con), 'espera de más por ómnibus desparejos', fmt(R.ewt_sin, 1), fmt(R.ewt_con, 1), 'min', Q.ewt, '#7fb2ff') +
+    anillo(cambio(R.apretados_sin, R.apretados_con), 'tiempo viajando apretado', fmt(R.apretados_sin * 100), fmt(R.apretados_con * 100), '% del viaje', Q.apretado, '#7fb2ff') +
+    anillo(cambio(R.pegados_sin, R.pegados_con), 'ómnibus pegados al de adelante', fmt(R.pegados_sin * 100), fmt(R.pegados_con * 100), '% en pico', Q.pegados, '#7fb2ff');
+  $('big').innerHTML = `
+    <div class="card cnt a">${info(Q.horas)}<div class="v"><span class="u" style="margin:0 4px 0 0">≈</span><span data-n="${aprox(S.horas_mes)}">0</span><span class="u">horas</span></div>
+      <div class="k">ahorradas por mes, sumando a todos los pasajeros</div><div class="s">≈ ${fmt(aprox(S.horas_mes / 8))} jornadas de trabajo · ≈ ${fmt(aprox(S.horas_dia))} horas por día hábil</div></div>
+    <div class="card cnt b">${info(Q.frecuente)}<div class="v"><span data-n="${aprox(S.min_por_viaje_red * 2 * R.dias_mes)}">0</span><span class="u">min</span></div>
+      <div class="k">por mes para quien viaja todos los días</div><div class="s">≈ ${fmt(aprox(S.min_por_viaje_red * 60))} segundos menos por viaje</div></div>
+    <div class="card cnt c">${info(Q.hapretado)}<div class="v"><span data-n="${Math.abs(cambio(R.horas_apretado_sin, apCon))}" data-pre="−" data-suf="%">0</span></div>
+      <div class="k">horas viajando apretado</div><div class="s">≈ ${fmt(aprox(S.horas_apretado_evitadas_dia))} horas-persona menos por día</div></div>`;
+  const cub = R.cobertura, ok = S.lineas / R.lineas * cub;
+  $('cover').innerHTML = `${info(Q.cobertura)}<b>Cubre el ${fmt(cub * 100)}% de los viajes</b>
+    <div class="bar"><i style="width:${ok * 100}%;background:var(--cyan)"></i><i style="width:${(cub - ok) * 100}%;background:rgba(255,255,255,.22)"></i></div>
+    <span>≈ ${fmt(aprox(R.pasajeros_dia))} de ≈ 1.000.000 viajes por día · pausas en ${S.lineas} de ${R.lineas} recorridos · el resto cuenta cero</span>`;
+  $('sat').innerHTML = `
+    <div class="card">${info(Q.espera)}<div class="v">${cambio(T.espera_sin, T.espera_con)}%</div><div class="k">espera (${fmt(T.espera_sin, 1)} → ${fmt(T.espera_con, 1)} min)</div></div>
+    <div class="card">${info(Q.apretado)}<div class="v">${cambio(T.apretados_sin, T.apretados_con)}%</div><div class="k">viaje apretado (${fmt(T.apretados_sin * 100)}% → ${fmt(T.apretados_con * 100)}%)</div></div>
+    <div class="card">${info(Q.horas)}<div class="v">≈ ${fmt(aprox(T.horas_mes))} h</div><div class="k">ahorradas por mes</div></div>
+    <div class="card">${info(Q.frecuente)}<div class="v">${fmt(aprox(T.min_por_viaje * 2 * R.dias_mes))} min</div><div class="k">por mes, pasajero frecuente</div></div>`;
+  alVer($('rings'), () => document.querySelectorAll('.ring .fg').forEach(c => c.style.strokeDashoffset = c.dataset.off));
+  alVer($('big'), () => $('big').querySelectorAll('[data-n]').forEach(el => contar(el, +el.dataset.n)));
+}
+
+// ---------- tabla y simulación
+function tabla() {
+  const q = $('q').value.trim().toLowerCase(), o = $('orden').value;
+  let L = filas.filter(x => !q || `${x.linea} ${x.destino}`.toLowerCase().includes(q));
+  const key = { horas: x => -(x.calidad_ok ? x.horas_dia : -1e9 + x.horas_dia), sat: x => -x.apretados_sin, pas: x => -x.pasajeros_dia, min: x => -x.min_por_viaje };
+  if (o === 'linea') L.sort((a, b) => a.linea.localeCompare(b.linea, 'es', { numeric: true }) || a.destino.localeCompare(b.destino));
+  else L.sort((a, b) => key[o](a) - key[o](b));
+  const maxh = Math.max(...filas.map(x => x.horas_dia)), p = x => fmt(x * 100) + '%';
+  $('cnt').textContent = `${L.length} recorridos`;
+  $('tabla').innerHTML = `<tr><th>Línea → destino</th><th>Ahorro/viaje</th><th>Horas/mes</th><th class="col-m">Espera (min)</th><th class="col-m">% apretado</th><th class="col-m">Pegados</th><th class="col-m">Viajes/día</th><th>Sin perjuicio</th></tr>` +
+    L.map(x => `<tr class="r ${sel === x.id ? 'sel' : ''}" data-id="${x.id}">
+      <td><b>${x.linea}</b> → ${x.destino}</td>
+      <td class="${x.min_por_viaje > 0 ? 'g' : ''}">${x.min_por_viaje >= 0 ? '−' : '+'}${fmt(Math.abs(x.min_por_viaje) * 60)} s</td>
+      <td class="g">${x.calidad_ok ? fmt(aprox(x.horas_mes)) : '<span style="color:var(--text-3)">0</span>'}<span class="hb" style="width:${Math.max(0, (x.calidad_ok ? x.horas_dia : 0) / maxh * 60)}px"></span></td>
+      <td class="col-m">${fmt(x.espera_sin, 1)}<span class="arr">→</span>${fmt(x.espera_con, 1)}</td>
+      <td class="col-m">${p(x.apretados_sin)}<span class="arr">→</span>${p(x.apretados_con)}</td>
+      <td class="col-m">${p(x.pegados_sin)}<span class="arr">→</span>${p(x.pegados_con)}</td>
+      <td class="col-m">${fmt(aprox(x.pasajeros_dia))}</td>
+      <td>${x.calidad_ok ? '<span class="ok">✓</span>' : '<span class="no">✗</span>'}</td></tr>`).join('');
+  document.querySelectorAll('tr.r').forEach(tr => tr.onclick = () => { ver(tr.dataset.id); $('sim').scrollIntoView({ behavior: 'smooth' }); });
+}
+function ver(id) {
+  sel = id; $('simsel').value = id;
+  $('frame').src = `animacion.html?embed=1&v=3&rec=${encodeURIComponent(id)}`;
+  $('abrir').href = `animacion.html?rec=${encodeURIComponent(id)}`;
+  document.querySelectorAll('tr.r').forEach(tr => tr.classList.toggle('sel', tr.dataset.id === id));
+}
+
+async function init() {
+  rayos();
+  document.querySelectorAll('.hero-stats [data-n]').forEach(el => contar(el, +el.dataset.n, 2000));
+  [IMP, IDX] = await Promise.all([fetch('data/sim/impacto.json').then(r => r.json()), fetch('data/anim/index.json').then(r => r.json())]);
+  const hay = new Set(IDX.map(x => `${x.linea}_${x.var}`));
+  filas = Object.entries(IMP.lineas).filter(([, x]) => x.cuenta_en_total).map(([id, x]) => ({ id, ...x }));
+  render();
+  const opts = filas.filter(x => hay.has(x.id)).sort((a, b) => b.horas_dia - a.horas_dia);
+  $('simsel').innerHTML = opts.map(x => `<option value="${x.id}">Línea ${x.linea} → ${x.destino}</option>`).join('');
+  $('simsel').onchange = e => ver(e.target.value);
+  $('q').oninput = tabla; $('orden').onchange = tabla;
+  tabla();
+  alVer($('sim'), () => { if (!sel) ver(opts[0].id); });
+}
+init();
+</script>
+
+
+</body></html>
